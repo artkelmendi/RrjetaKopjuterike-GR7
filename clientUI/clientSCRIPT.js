@@ -34,3 +34,42 @@ function connectToServer() {
             alert("Failed to connect to the server. Please check the Server ID and Port.");
         });
 }
+function sendMessage() {
+    const message = document.getElementById('message-input').value;
+    const clientName = document.getElementById('client-name').value || 'Anonymous';
+    const serverId = document.getElementById('server-id').value;
+    const port = document.getElementById('port').value;
+
+    if (!message.trim()) {
+        alert("Please enter a message.");
+        return;
+    }
+
+
+    const url = `http://${serverId}:${port}/send-message`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: clientName, message })
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const chatBox = document.getElementById('chat-box');
+                const msgElement = document.createElement('div');
+                msgElement.textContent = `${clientName}: ${message}`;
+                chatBox.appendChild(msgElement);
+
+                // Clear the input
+                document.getElementById('message-input').value = '';
+            }
+        })
+        .catch(error => console.error('Error sending message:', error));
+}
+

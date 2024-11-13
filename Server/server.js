@@ -1,10 +1,14 @@
 const express = require('express');
+const http = require('http');
 const path = require('path');
 const os = require('os');
 const cors = require('cors');
+const socketIo = require('socket.io');
 
 const app = express();
-let server;
+const server = http.createServer(app); // Create HTTP server
+const io = socketIo(server); // Attach Socket.IO to the server
+
 let currentPort = 3000;
 const clients = []; // Array to store connected client information
 
@@ -43,6 +47,9 @@ app.post('/connect', (req, res) => {
     };
 
     clients.push(clientInfo); // Add client info to the array
+
+    // Emit the updated client count to all connected clients
+    io.emit('clientCountUpdate', clients.length);
 
     res.json({ message: 'Connection successful!', clientInfo });
 });
@@ -92,7 +99,7 @@ app.post('/set-port', (req, res) => {
 // Function to start the server on a specific port
 const startServer = (port, res = null) => {
     currentPort = port;
-    server = app.listen(currentPort, () => {
+    server.listen(currentPort, () => {
         console.log(`Server is now listening on http://${getIPAddress()}:${currentPort}`);
         if (res) {
             res.json({ port: currentPort });
@@ -104,6 +111,52 @@ const startServer = (port, res = null) => {
         }
     });
 };
+
+// Array to store chat messages
+const messages = [];
+
+// Endpoint to receive and store chat messages
+app.post('/send-message', (req, res) => {
+    const { name, message } = req.body;
+
+    if (!name || !message) {
+        return res.status(400).json({ error: 'Name and message are required' });
+    }
+
+    // Get the current time and format it as HH:MM
+    const timestamp = new Date().toISOString();
+
+    // Store the message with name and timestamp
+    const chatMessage = { name, message, timestamp };
+    messages.push(chatMessage);
+
+    // Emit the new message to all connected clients
+    io.emit('newMessage', chatMessage);
+
+    res.status(200).json({ success: true, message: 'Message received' });
+});
+
+// Endpoint to retrieve chat log
+app.get('/chat-log', (req, res) => {
+    res.json(messages);
+});
+
+// Endpoint to get the count of active clients
+app.get('/client-count', (req, res) => {
+    res.json({ count: clients.length });
+});
+
+// Handle WebSocket connection and disconnection
+io.on('connection', (socket) => {
+    console.log('A client connected');
+
+    // Update client count when a client disconnects
+    socket.on('disconnect', () => {
+        clients.pop(); // Simulate client disconnection by removing from array
+        io.emit('clientCountUpdate', clients.length); // Broadcast updated client count
+        console.log('A client disconnected');
+    });
+});
 
 // Initial server start
 startServer(currentPort);

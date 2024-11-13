@@ -22,7 +22,16 @@
         <input type="number" id="port" placeholder="Enter Port Number">
     </div>
     <button onclick="connectToServer()">Connect</button>
-</div>
+
+    <div id="chat-section">
+        <h2>Chat</h2>
+        <div id="chat-box"></div>
+        <div id="message-input-section">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
 <script src="clientSCRIPT.js"></script>
 </body>
 </html>

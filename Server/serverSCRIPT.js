@@ -1,5 +1,43 @@
 console.log("serverSCRIPT.js is loaded and running");
 
+// Initialize Socket.IO connection
+const socket = io();
+
+// Listen for real-time client count updates
+socket.on('clientCountUpdate', (count) => {
+    updateClientCount(count);
+});
+
+// Listen for real-time new messages
+socket.on('newMessage', (msg) => {
+    const chatLog = document.getElementById('chat-log');
+
+    // Create and append the new message element
+    const msgElement = document.createElement('div');
+    msgElement.classList.add('message');
+
+    const nameElement = document.createElement('span');
+    nameElement.classList.add('name');
+    nameElement.textContent = msg.name;
+
+    const timeElement = document.createElement('span');
+    timeElement.classList.add('timestamp');
+    const timestamp = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    timeElement.textContent = `(${timestamp})`;
+
+    const contentElement = document.createElement('span');
+    contentElement.classList.add('content');
+    contentElement.textContent = `: ${msg.message}`;
+
+    msgElement.appendChild(nameElement);
+    msgElement.appendChild(timeElement);
+    msgElement.appendChild(contentElement);
+
+    chatLog.appendChild(msgElement);
+    chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to the latest message
+});
+
+// Fetch and display server information
 fetch('/server-info')
     .then(response => {
         if (!response.ok) {
@@ -14,7 +52,7 @@ fetch('/server-info')
     })
     .catch(error => console.error('Error fetching server info:', error));
 
-// Function to set the server's listening port
+// Function to fetch and display the list of connected clients
 function fetchClients() {
     fetch('/clients')
         .then(response => response.json())
@@ -32,17 +70,20 @@ function fetchClients() {
                 li.textContent = `Name: ${client.name}, IP: ${client.ip}, Connected At: ${formattedTime}`;
                 clientList.appendChild(li);
             });
+
+            // Update active client count display
+            updateClientCount(clients.length);
         })
         .catch(error => console.error('Error fetching clients:', error));
 }
 
-// Fetch client list every 10 seconds
-setInterval(fetchClients, 1000);
+// Function to update the active client count display
+function updateClientCount(count) {
+    const clientCountElement = document.getElementById('active-client-count');
+    clientCountElement.textContent = `Active Clients: ${count}`;
+}
 
-
-// Fetch client list every 5 seconds
-setInterval(fetchClients, 5000);
-
+// Function to set the server's listening port
 function setPort() {
     const port = document.getElementById('port-input').value;
     if (!port) {
@@ -65,10 +106,10 @@ function setPort() {
             document.getElementById('port').textContent = data.port;
             alert(`Server is now listening on port ${data.port}`);
 
-            // Wait a moment and reload the page on the new port
+            // Automatically redirect to the new port
             setTimeout(() => {
                 window.location.href = `http://${window.location.hostname}:${data.port}`;
-            }, 1000);
+            }, 1000); // Delay by 1 second to allow server time to restart
         })
         .catch(error => console.error('Error setting port:', error));
 }

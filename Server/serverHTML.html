@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Server Info</title>
     <link rel="stylesheet" href="serverSTYLE.css">
-    <link rel="shortcut icon" href="">
 </head>
 <body>
+<div id="active-client-count" style="position: fixed; top: 10px; right: 10px; font-size: 14px; color: #007BFF;">
+    Active Clients: 0
+</div>
 <div class="container">
     <h1>Server Information</h1>
-
     <div id="server-info">
         <p>IP Address: <span id="ip"></span></p>
         <p>Port: <span id="port"></span></p>
@@ -24,8 +25,13 @@
 
     <h2>Connected Clients</h2>
     <ul id="client-list"></ul>
+
+    <h2>Chat Logs</h2>
+    <div id="chat-log"></div>
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script src="serverSCRIPT.js"></script>
+
 </body>
 </html>
