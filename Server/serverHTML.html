@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Info</title>
+    <link rel="stylesheet" href="serverSTYLE.css">
+    <link rel="shortcut icon" href="">
+</head>
+<body>
+<div class="container">
+    <h1>Server Information</h1>
+
+    <div id="server-info">
+        <p>IP Address: <span id="ip"></span></p>
+        <p>Port: <span id="port"></span></p>
+    </div>
+
+    <h2>Set Listening Port</h2>
+    <div class="port-setting">
+        <input type="number" id="port-input" placeholder="Enter port number">
+        <button onclick="setPort()">Start Listening on Port</button>
+    </div>
+
+    <h2>Connected Clients</h2>
+    <ul id="client-list"></ul>
+</div>
+
+<script src="serverSCRIPT.js"></script>
+</body>
+</html>

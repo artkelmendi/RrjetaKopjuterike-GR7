@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Connection</title>
+    <link rel="stylesheet" href="clientSTYLE.css">
+</head>
+<body>
+<div class="container">
+    <h1>Connect to Server</h1>
+    <div class="input-group">
+        <label for="client-name">Name:</label>
+        <input type="text" id="client-name" placeholder="Enter your name">
+    </div>
+    <div class="input-group">
+        <label for="server-id">Server ID:</label>
+        <input type="text" id="server-id" placeholder="Enter Server ID">
+    </div>
+    <div class="input-group">
+        <label for="port">Port:</label>
+        <input type="number" id="port" placeholder="Enter Port Number">
+    </div>
+    <button onclick="connectToServer()">Connect</button>
+</div>
+<script src="clientSCRIPT.js"></script>
+</body>
+</html>
