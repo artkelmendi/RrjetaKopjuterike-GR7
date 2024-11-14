@@ -1,162 +1,259 @@
-const express = require('express');
-const http = require('http');
-const path = require('path');
-const os = require('os');
-const cors = require('cors');
-const socketIo = require('socket.io');
+const express = require("express");
+const http = require("http");
+const path = require("path");
+const os = require("os");
+const cors = require("cors");
+const socketIo = require("socket.io");
+const fs = require("fs");
 
 const app = express();
-const server = http.createServer(app); // Create HTTP server
-const io = socketIo(server); // Attach Socket.IO to the server
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
 
-let currentPort = 3000;
-const clients = []; // Array to store connected client information
-
-app.use(express.json());
-app.use(cors());
-app.use(express.static(path.join(__dirname)));
-
-// Helper function to get IP address
-const getIPAddress = () => {
-    const interfaces = os.networkInterfaces();
-    for (let name in interfaces) {
-        for (let iface of interfaces[name]) {
-            if (iface.family === 'IPv4' && !iface.internal) {
-                return iface.address;
-            }
-        }
-    }
-    return '127.0.0.1';
+// Configuration
+const config = {
+  defaultPort: 3000,
+  allowedDirectory: path.join(__dirname, "allowed_files"),
 };
 
-// Serve the main HTML file at the root URL
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'serverHTML.html'));
-});
-
-// Endpoint to test client connection and log connection details
-app.post('/connect', (req, res) => {
-    const { name, port } = req.body;
-    const clientIP = req.ip;
-
-    const clientInfo = {
-        ip: clientIP,
-        name: name || 'Anonymous',
-        port: port,
-        connectedAt: new Date().toISOString()
-    };
-
-    clients.push(clientInfo); // Add client info to the array
-
-    // Emit the updated client count to all connected clients
-    io.emit('clientCountUpdate', clients.length);
-
-    res.json({ message: 'Connection successful!', clientInfo });
-});
-
-// Endpoint to get the list of connected clients
-app.get('/clients', (req, res) => {
-    res.json(clients);
-});
-
-// Endpoint to test client-server connection
-app.get('/test-connection', (req, res) => {
-    res.json({ message: 'Connection successful!' });
-});
-
-// Endpoint to get server info
-app.get('/server-info', (req, res) => {
-    res.json({
-        ip: getIPAddress(),
-        port: currentPort,
-    });
-});
-
-// Endpoint to set the listening port
-app.post('/set-port', (req, res) => {
-    const port = parseInt(req.query.port, 10);
-    if (isNaN(port) || port <= 0 || port > 65535) {
-        return res.status(400).json({ error: 'Invalid port number' });
-    }
-
-    console.log(`Received request to change port to: ${port}`);
-
-    // Close the existing server if it's running
-    if (server) {
-        server.close(err => {
-            if (err) {
-                console.error("Error closing the server:", err);
-                return res.status(500).json({ error: 'Error closing the server' });
-            }
-            console.log(`Server stopped listening on port ${currentPort}`);
-            startServer(port, res);  // Start on the new port
-        });
-    } else {
-        startServer(port, res);
-    }
-});
-
-// Function to start the server on a specific port
-const startServer = (port, res = null) => {
-    currentPort = port;
-    server.listen(currentPort, () => {
-        console.log(`Server is now listening on http://${getIPAddress()}:${currentPort}`);
-        if (res) {
-            res.json({ port: currentPort });
-        }
-    }).on('error', (err) => {
-        console.error(`Error starting server on port ${currentPort}:`, err);
-        if (res) {
-            res.status(500).json({ error: 'Could not start server on this port' });
-        }
-    });
-};
-
-// Array to store chat messages
+// State management
+let currentPort = config.defaultPort;
+const clients = new Map();
 const messages = [];
 
-// Endpoint to receive and store chat messages
-app.post('/send-message', (req, res) => {
-    const { name, message } = req.body;
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-    if (!name || !message) {
-        return res.status(400).json({ error: 'Name and message are required' });
+// Ensure allowed_files directory exists
+if (!fs.existsSync(config.allowedDirectory)) {
+  fs.mkdirSync(config.allowedDirectory, { recursive: true });
+}
+
+// Helper functions
+const getIPAddress = () => {
+  const interfaces = os.networkInterfaces();
+  for (let name in interfaces) {
+    for (let iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return iface.address;
+      }
     }
+  }
+  return "127.0.0.1";
+};
 
-    // Get the current time and format it as HH:MM
-    const timestamp = new Date().toISOString();
+const isPathSafe = (filePath) => {
+  const normalizedPath = path.normalize(filePath);
+  return normalizedPath.startsWith(config.allowedDirectory);
+};
 
-    // Store the message with name and timestamp
-    const chatMessage = { name, message, timestamp };
-    messages.push(chatMessage);
-
-    // Emit the new message to all connected clients
-    io.emit('newMessage', chatMessage);
-
-    res.status(200).json({ success: true, message: 'Message received' });
+// API Routes
+app.get("/server-info", (req, res) => {
+  const serverInfo = {
+    ip: getIPAddress(),
+    port: currentPort,
+  };
+  console.log("Sending server info:", serverInfo);
+  res.json(serverInfo);
 });
 
-// Endpoint to retrieve chat log
-app.get('/chat-log', (req, res) => {
-    res.json(messages);
+app.post("/connect", (req, res) => {
+  const { name, port, socketId } = req.body;
+  const clientInfo = {
+    name: name || "Anonymous",
+    port: port,
+    socketId: socketId,
+    connectedAt: new Date().toISOString(),
+  };
+
+  clients.set(socketId, clientInfo);
+  io.emit("clientCountUpdate", clients.size);
+
+  res.json({ message: "Connection successful!", clientInfo });
 });
 
-// Endpoint to get the count of active clients
-app.get('/client-count', (req, res) => {
-    res.json({ count: clients.length });
+app.get("/clients", (req, res) => {
+  res.json(Array.from(clients.values()));
 });
 
-// Handle WebSocket connection and disconnection
-io.on('connection', (socket) => {
-    console.log('A client connected');
+app.post("/send-message", (req, res) => {
+  const { name, message } = req.body;
+  const messageInfo = {
+    name,
+    message,
+    timestamp: new Date().toISOString(),
+  };
 
-    // Update client count when a client disconnects
-    socket.on('disconnect', () => {
-        clients.pop(); // Simulate client disconnection by removing from array
-        io.emit('clientCountUpdate', clients.length); // Broadcast updated client count
-        console.log('A client disconnected');
+  messages.push(messageInfo);
+  io.emit("newMessage", messageInfo);
+  res.json({ success: true });
+});
+
+app.post("/read-file", (req, res) => {
+  const { filePath } = req.body;
+  const fullPath = path.join(config.allowedDirectory, filePath);
+
+  if (!isPathSafe(fullPath)) {
+    return res.status(403).json({ success: false, message: "Access denied" });
+  }
+
+  fs.readFile(fullPath, "utf8", (err, data) => {
+    if (err) {
+      console.error("Error reading file:", err);
+      return res
+        .status(500)
+        .json({ success: false, message: "File read error" });
+    }
+    res.json({ success: true, content: data });
+  });
+});
+
+app.post("/write-file", (req, res) => {
+  const { filePath, content } = req.body;
+  const fullPath = path.join(config.allowedDirectory, filePath);
+
+  if (!isPathSafe(fullPath)) {
+    return res.status(403).json({ success: false, message: "Access denied" });
+  }
+
+  fs.writeFile(fullPath, content, "utf8", (err) => {
+    if (err) {
+      console.error("Error writing file:", err);
+      return res
+        .status(500)
+        .json({ success: false, message: "File write error" });
+    }
+    io.emit("fileAction", { action: "write", filePath });
+    res.json({ success: true, message: "File written successfully" });
+  });
+});
+
+app.post("/delete-file", (req, res) => {
+  const { filePath } = req.body;
+  const fullPath = path.join(config.allowedDirectory, filePath);
+
+  if (!isPathSafe(fullPath)) {
+    return res.status(403).json({ success: false, message: "Access denied" });
+  }
+
+  fs.unlink(fullPath, (err) => {
+    if (err) {
+      console.error("Error deleting file:", err);
+      return res
+        .status(500)
+        .json({ success: false, message: "File delete error" });
+    }
+    io.emit("fileAction", { action: "delete", filePath });
+    res.json({ success: true, message: "File deleted successfully" });
+  });
+});
+
+// Socket.IO event handlers
+// In your Socket.IO event handlers section
+io.on("connection", (socket) => {
+  console.log("Client connected:", socket.id);
+
+  socket.on("chatMessage", (messageData) => {
+    const messageInfo = {
+      name: messageData.name,
+      message: messageData.message,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Broadcast to all clients including sender
+    io.emit("newMessage", messageInfo);
+  });
+
+  socket.on("disconnect", () => {
+    clients.delete(socket.id);
+    io.emit("clientCountUpdate", clients.size);
+  });
+});
+
+// Remove or modify the /send-message endpoint since we're using socket events
+
+// Static files
+app.use(express.static(path.join(__dirname)));
+
+// Catch-all route
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "serverHTML.html"));
+});
+
+// Port finding and server start
+const findAvailablePort = async (startPort) => {
+  let port = startPort;
+  const maxPort = startPort + 10;
+
+  while (port < maxPort) {
+    try {
+      await new Promise((resolve, reject) => {
+        const testServer = http.createServer();
+        testServer.listen(port, () => {
+          testServer.close();
+          resolve();
+        });
+        testServer.on("error", () => {
+          reject();
+        });
+      });
+      return port;
+    } catch {
+      port++;
+    }
+  }
+  throw new Error("No available ports found");
+};
+
+const startServer = async (port = config.defaultPort) => {
+  try {
+    const availablePort = await findAvailablePort(port);
+    currentPort = availablePort;
+
+    return new Promise((resolve, reject) => {
+      server
+        .listen(currentPort, () => {
+          const address = getIPAddress();
+          console.log(`Server running at http://${address}:${currentPort}`);
+          resolve(currentPort);
+        })
+        .on("error", (err) => {
+          console.error(`Error starting server:`, err);
+          reject(err);
+        });
     });
+  } catch (error) {
+    console.error("Server start failed:", error);
+    throw error;
+  }
+};
+
+// Handle port changes
+app.post("/set-port", async (req, res) => {
+  const { port } = req.query;
+  const newPort = parseInt(port);
+
+  if (!port || newPort < 1 || newPort > 65535) {
+    return res.status(400).json({ error: "Invalid port number" });
+  }
+
+  try {
+    await server.close();
+    const usedPort = await startServer(newPort);
+    res.json({ success: true, port: usedPort });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to change port" });
+  }
 });
 
-// Initial server start
-startServer(currentPort);
+// Start the server
+startServer().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});

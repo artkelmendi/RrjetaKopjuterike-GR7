@@ -1,115 +1,232 @@
-console.log("serverSCRIPT.js is loaded and running");
+/// DOM Elements
+const elements = {
+  ip: document.getElementById("ip"),
+  port: document.getElementById("port"),
+  portInput: document.getElementById("port-input"),
+  clientList: document.getElementById("client-list"),
+  chatLog: document.getElementById("chat-log"),
+  chatName: document.getElementById("chat-name"),
+  chatMessage: document.getElementById("chat-message"),
+  filePath: document.getElementById("file-path"),
+  fileContent: document.getElementById("file-content"),
+  activeClientCount: document.getElementById("active-client-count"),
+};
 
-// Initialize Socket.IO connection
-const socket = io();
+// Socket.IO connection
+let socket = io();
 
-// Listen for real-time client count updates
-socket.on('clientCountUpdate', (count) => {
-    updateClientCount(count);
-});
+// Initialize server info
+async function initializeServerInfo() {
+  try {
+    const response = await fetch("/server-info", {
+      headers: {
+        Accept: "application/json",
+      },
+    });
 
-// Listen for real-time new messages
-socket.on('newMessage', (msg) => {
-    const chatLog = document.getElementById('chat-log');
-
-    // Create and append the new message element
-    const msgElement = document.createElement('div');
-    msgElement.classList.add('message');
-
-    const nameElement = document.createElement('span');
-    nameElement.classList.add('name');
-    nameElement.textContent = msg.name;
-
-    const timeElement = document.createElement('span');
-    timeElement.classList.add('timestamp');
-    const timestamp = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    timeElement.textContent = `(${timestamp})`;
-
-    const contentElement = document.createElement('span');
-    contentElement.classList.add('content');
-    contentElement.textContent = `: ${msg.message}`;
-
-    msgElement.appendChild(nameElement);
-    msgElement.appendChild(timeElement);
-    msgElement.appendChild(contentElement);
-
-    chatLog.appendChild(msgElement);
-    chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to the latest message
-});
-
-// Fetch and display server information
-fetch('/server-info')
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("Server info fetched successfully:", data);
-        document.getElementById('ip').textContent = data.ip;
-        document.getElementById('port').textContent = data.port;
-    })
-    .catch(error => console.error('Error fetching server info:', error));
-
-// Function to fetch and display the list of connected clients
-function fetchClients() {
-    fetch('/clients')
-        .then(response => response.json())
-        .then(clients => {
-            const clientList = document.getElementById('client-list');
-            clientList.innerHTML = ''; // Clear existing list
-
-            clients.forEach(client => {
-                // Format the connection time to display only hours and minutes
-                const connectedAt = new Date(client.connectedAt);
-                const formattedTime = connectedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                // Create list item for each client
-                const li = document.createElement('li');
-                li.textContent = `Name: ${client.name}, IP: ${client.ip}, Connected At: ${formattedTime}`;
-                clientList.appendChild(li);
-            });
-
-            // Update active client count display
-            updateClientCount(clients.length);
-        })
-        .catch(error => console.error('Error fetching clients:', error));
-}
-
-// Function to update the active client count display
-function updateClientCount(count) {
-    const clientCountElement = document.getElementById('active-client-count');
-    clientCountElement.textContent = `Active Clients: ${count}`;
-}
-
-// Function to set the server's listening port
-function setPort() {
-    const port = document.getElementById('port-input').value;
-    if (!port) {
-        alert('Please enter a port number.');
-        return;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    console.log("Attempting to set new port to:", port);
+    const data = await response.json();
+    console.log("Server info received:", data);
 
-    fetch(`/set-port?port=${port}`, { method: 'POST' })
-        .then(response => {
-            console.log("Received response from /set-port:", response);
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log("Port successfully updated to:", data.port);
-            document.getElementById('port').textContent = data.port;
-            alert(`Server is now listening on port ${data.port}`);
-
-            // Automatically redirect to the new port
-            setTimeout(() => {
-                window.location.href = `http://${window.location.hostname}:${data.port}`;
-            }, 1000); // Delay by 1 second to allow server time to restart
-        })
-        .catch(error => console.error('Error setting port:', error));
+    if (data.ip && data.port) {
+      elements.ip.textContent = data.ip;
+      elements.port.textContent = data.port;
+    } else {
+      console.error("Invalid server info data:", data);
+    }
+  } catch (error) {
+    console.error("Error fetching server info:", error);
+  }
 }
+
+// Port management
+async function setPort() {
+  const port = elements.portInput.value;
+  if (!port || port < 1 || port > 65535) {
+    alert("Please enter a valid port number (1-65535)");
+    return;
+  }
+
+  try {
+    const response = await fetch(`/set-port?port=${port}`, { method: "POST" });
+    const data = await response.json();
+
+    if (data.error) {
+      alert(`Error: ${data.error}`);
+    } else {
+      elements.port.textContent = data.port;
+      alert(`Server now listening on port ${data.port}`);
+    }
+  } catch (error) {
+    console.error("Error setting port:", error);
+    alert("Failed to change port");
+  }
+}
+
+// Client management
+async function updateClientList() {
+  try {
+    const response = await fetch("/clients");
+    const clients = await response.json();
+
+    elements.clientList.innerHTML = clients
+      .map(
+        (client) => `
+          <li>
+              <strong>${client.name}</strong>
+              <span class="client-info">Connected: ${new Date(
+                client.connectedAt
+              ).toLocaleString()}</span>
+          </li>
+      `
+      )
+      .join("");
+  } catch (error) {
+    console.error("Error updating client list:", error);
+  }
+}
+
+// Message handling
+async function sendMessage() {
+  const message = elements.chatMessage.value;
+  const name = elements.chatName.value || "Anonymous";
+
+  if (!message.trim()) {
+    alert("Please enter a message");
+    return;
+  }
+
+  try {
+    const response = await fetch("/send-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, message }),
+    });
+
+    if (!response.ok) throw new Error("Failed to send message");
+
+    elements.chatMessage.value = "";
+  } catch (error) {
+    console.error("Error sending message:", error);
+    alert("Failed to send message");
+  }
+}
+
+// File operations
+async function readFile() {
+  const filePath = elements.filePath.value;
+  if (!filePath) {
+    alert("Please enter a file path");
+    return;
+  }
+
+  try {
+    const response = await fetch("/read-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      elements.fileContent.value = data.content;
+      alert("File read successfully");
+    } else {
+      throw new Error(data.message);
+    }
+  } catch (error) {
+    console.error("Error reading file:", error);
+    alert(`Error reading file: ${error.message}`);
+  }
+}
+
+async function writeFile() {
+  const filePath = elements.filePath.value;
+  const content = elements.fileContent.value;
+
+  if (!filePath || !content) {
+    alert("Please enter both file path and content");
+    return;
+  }
+
+  try {
+    const response = await fetch("/write-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath, content }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      alert("File written successfully");
+    } else {
+      throw new Error(data.message);
+    }
+  } catch (error) {
+    console.error("Error writing file:", error);
+    alert(`Error writing file: ${error.message}`);
+  }
+}
+
+async function deleteFile() {
+  const filePath = elements.filePath.value;
+  if (!filePath) {
+    alert("Please enter a file path");
+    return;
+  }
+
+  if (!confirm("Are you sure you want to delete this file?")) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/delete-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      elements.fileContent.value = "";
+      alert("File deleted successfully");
+    } else {
+      throw new Error(data.message);
+    }
+  } catch (error) {
+    console.error("Error deleting file:", error);
+    alert(`Error deleting file: ${error.message}`);
+  }
+}
+
+// Socket event handlers
+socket.on("clientCountUpdate", (count) => {
+  elements.activeClientCount.textContent = `Active Clients: ${count}`;
+  updateClientList();
+});
+
+socket.on("newMessage", (message) => {
+  const messageDiv = document.createElement("div");
+  messageDiv.className = "message";
+  messageDiv.innerHTML = `
+      <strong>${message.name}</strong>: ${message.message}
+      <small class="timestamp">${new Date(
+        message.timestamp
+      ).toLocaleString()}</small>
+  `;
+  elements.chatLog.appendChild(messageDiv);
+  elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+});
+
+socket.on("fileAction", (data) => {
+  alert(`File ${data.action} action performed on: ${data.filePath}`);
+});
+
+// Initialize
+document.addEventListener("DOMContentLoaded", () => {
+  initializeServerInfo();
+  updateClientList();
+});

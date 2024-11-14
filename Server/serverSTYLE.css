@@ -1,129 +1,243 @@
-/* Import Montserrat font from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+/* Base Styles and Typography */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
+
+:root {
+  --primary-color: #007bff;
+  --primary-hover: #0056b3;
+  --text-color: #333;
+  --light-bg: #f4f4f9;
+  --border-color: #ddd;
+  --shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  --small-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
-    font-family: 'Montserrat', sans-serif;
-    text-align: center;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f9;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+  font-family: "Montserrat", sans-serif;
+  background-color: var(--light-bg);
+  color: var(--text-color);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Layout Components */
+.status-bar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  padding: 10px;
+  background-color: white;
+  box-shadow: var(--small-shadow);
+  z-index: 1000;
 }
 
 .container {
-    width: 400px;
-    background-color: #fff;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-    text-align: center;
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+/* Typography */
+h1,
+h2 {
+  color: var(--text-color);
+  margin-bottom: 1rem;
 }
 
 h1 {
-    color: #333;
-    font-size: 24px;
-    margin-bottom: 20px;
-}
-
-#server-info {
-    font-size: 18px;
-    background-color: #eef2f5;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
-}
-
-#server-info span {
-    font-weight: bold;
-    color: #007BFF;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 h2 {
-    color: #333;
-    font-size: 20px;
-    margin: 20px 0 10px;
+  font-size: 20px;
+  font-weight: 600;
+  margin-top: 2rem;
 }
 
-.port-setting {
-    margin-bottom: 20px;
+/* Server Info Section */
+.server-info-section {
+  margin-bottom: 2rem;
 }
 
-#port-input {
-    width: 100%;
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
+.info-panel {
+  background-color: var(--light-bg);
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: var(--small-shadow);
 }
 
-button {
-    width: 100%;
-    padding: 10px;
-    font-size: 16px;
-    color: #fff;
-    background-color: #007BFF;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+.highlight {
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
-button:hover {
-    background-color: #0056b3;
+/* Form Elements */
+input,
+textarea {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
 }
 
-/* Styles for Connected Clients List */
-#client-list {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-    max-height: 200px;
-    overflow-y: auto; /* Scroll if list is too long */
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
 }
 
-#client-list li {
-    background-color: #f9f9f9;
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 5px;
-    font-size: 14px;
-    color: #333;
-    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+textarea {
+  resize: vertical;
+  min-height: 100px;
 }
 
-#client-list li span {
-    font-weight: bold;
-    color: #007BFF;
-}
-#chat-log {
-    width: 100%;
-    height: 200px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 10px;
-    overflow-y: auto;
-    background-color: #f9f9f9;
-    margin-top: 10px;
-    font-size: 14px;
+/* Buttons */
+.primary-button,
+.action-button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-#chat-log .message {
-    margin-bottom: 10px;
+.primary-button {
+  background-color: var(--primary-color);
+  color: white;
 }
 
-#chat-log .message .name {
-    font-weight: bold;
-    color: #007BFF;
+.primary-button:hover {
+  background-color: var(--primary-hover);
 }
 
-#chat-log .message .timestamp {
-    font-size: 12px;
-    color: #666;
-    margin-left: 5px;
+.action-button {
+  background-color: #f0f0f0;
+  color: var(--text-color);
+  margin: 0 5px;
+}
+
+.action-button:hover {
+  background-color: #e0e0e0;
+}
+
+.action-button.danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-button.danger:hover {
+  background-color: #c82333;
+}
+
+/* Client List */
+.client-list {
+  list-style: none;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 1rem 0;
+}
+
+.client-list li {
+  background-color: var(--light-bg);
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 5px;
+  font-size: 14px;
+  box-shadow: var(--small-shadow);
+}
+
+/* Chat Section */
+.chat-section {
+  margin: 2rem 0;
+}
+
+.chat-log {
+  height: 300px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 15px;
+  overflow-y: auto;
+  background-color: white;
+  margin-bottom: 1rem;
+}
+
+.chat-input {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-input input {
+  margin-bottom: 0;
+}
+
+.message {
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: var(--light-bg);
+  border-radius: 5px;
+}
+
+.message .timestamp {
+  font-size: 12px;
+  color: #666;
+  margin-left: 5px;
+}
+
+/* File Operations */
+.file-operations {
+  background-color: var(--light-bg);
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.file-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+/* Message Container */
+.message-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  max-width: 300px;
+  z-index: 1000;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    margin: 10px;
+    padding: 15px;
+  }
+
+  .chat-input {
+    flex-direction: column;
+  }
+
+  .file-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .action-button {
+    margin: 5px 0;
+  }
 }

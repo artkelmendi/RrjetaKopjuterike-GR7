@@ -1,37 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Server Info</title>
-    <link rel="stylesheet" href="serverSTYLE.css">
-</head>
-<body>
-<div id="active-client-count" style="position: fixed; top: 10px; right: 10px; font-size: 14px; color: #007BFF;">
-    Active Clients: 0
-</div>
-<div class="container">
-    <h1>Server Information</h1>
-    <div id="server-info">
-        <p>IP Address: <span id="ip"></span></p>
-        <p>Port: <span id="port"></span></p>
-    </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Server management interface for file operations and chat"
+    />
+    <title>Server Management Interface</title>
+    <link rel="stylesheet" href="serverSTYLE.css" />
+  </head>
+  <body>
+    <!-- Status Bar -->
+    <header class="status-bar">
+      <div id="active-client-count" class="client-counter">
+        Active Clients: 0
+      </div>
+    </header>
 
-    <h2>Set Listening Port</h2>
-    <div class="port-setting">
-        <input type="number" id="port-input" placeholder="Enter port number">
-        <button onclick="setPort()">Start Listening on Port</button>
-    </div>
+    <main class="container">
+      <!-- Server Information Section -->
+      <section class="server-info-section">
+        <h1>Server Information</h1>
+        <div id="server-info" class="info-panel">
+          <p>IP Address: <span id="ip" class="highlight"></span></p>
+          <p>Port: <span id="port" class="highlight"></span></p>
+        </div>
 
-    <h2>Connected Clients</h2>
-    <ul id="client-list"></ul>
+        <!-- Port Configuration -->
+        <div class="port-config">
+          <h2>Set Listening Port</h2>
+          <div class="port-setting">
+            <input
+              type="number"
+              id="port-input"
+              placeholder="Enter port number (1-65535)"
+              min="1"
+              max="65535"
+              required
+            />
+            <button onclick="setPort()" class="primary-button">
+              Start Listening on Port
+            </button>
+          </div>
+        </div>
+      </section>
 
-    <h2>Chat Logs</h2>
-    <div id="chat-log"></div>
-</div>
+      <!-- Client Management Section -->
+      <section class="clients-section">
+        <h2>Connected Clients</h2>
+        <ul id="client-list" class="client-list"></ul>
+      </section>
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="serverSCRIPT.js"></script>
+      <!-- Chat Section -->
+      <section class="chat-section">
+        <h2>Chat Logs</h2>
+        <div id="chat-log" class="chat-log"></div>
+        <div class="chat-input">
+          <input
+            type="text"
+            id="chat-name"
+            placeholder="Your name"
+            maxlength="50"
+          />
+          <input
+            type="text"
+            id="chat-message"
+            placeholder="Type a message"
+            maxlength="500"
+          />
+          <button onclick="sendMessage()" class="primary-button">Send</button>
+        </div>
+      </section>
 
-</body>
+      <!-- File Operations Section -->
+      <section class="file-operations-section">
+        <h2>File Operations</h2>
+        <div class="file-operations">
+          <div class="file-path-input">
+            <input
+              type="text"
+              id="file-path"
+              placeholder="Enter file path (relative to allowed_files directory)"
+              maxlength="255"
+            />
+          </div>
+          <div class="file-content-area">
+            <textarea
+              id="file-content"
+              placeholder="File content"
+              rows="6"
+            ></textarea>
+          </div>
+          <div class="file-buttons">
+            <button
+              onclick="readFile()"
+              class="action-button"
+              title="Read file contents"
+            >
+              Read File
+            </button>
+            <button
+              onclick="writeFile()"
+              class="action-button"
+              title="Save changes to file"
+            >
+              Write File
+            </button>
+            <button
+              onclick="deleteFile()"
+              class="action-button danger"
+              title="Delete file permanently"
+            >
+              Delete File
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Error/Success Message Container -->
+    <div id="message-container" class="message-container"></div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="serverSCRIPT.js"></script>
+  </body>
 </html>
