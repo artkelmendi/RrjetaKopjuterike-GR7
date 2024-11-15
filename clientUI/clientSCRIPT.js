@@ -11,6 +11,9 @@ const elements = {
   notificationContainer: document.getElementById("notification-container"),
 };
 
+const dgram = require('dgram');
+const client = dgram.createSocket('udp4');
+
 // Socket.IO connection
 let socket = null;
 
@@ -22,6 +25,22 @@ const showNotification = (message, type = "info") => {
   elements.notificationContainer.appendChild(notification);
   setTimeout(() => notification.remove(), 3000);
 };
+
+function sendMessageUDP(message) {
+  const messageBuffer = Buffer.from(message);
+  client.send(messageBuffer, 0, messageBuffer.length, 41234, 'localhost', (err) => {
+    if (err) {
+      console.error('Error sending UDP message:', err);
+    } else {
+      console.log('UDP message sent');
+    }
+  });
+}
+
+socket.emit('requestAccess');
+socket.on('accessGranted', () => {
+  console.log('Access granted to client');
+});
 
 const getServerUrl = () => {
   const serverId = elements.serverId.value;
@@ -190,9 +209,15 @@ async function sendMessage() {
   }
 
   try {
-    // Emit the message directly through socket instead of fetch
+    // Dërgo mesazhin me UDP
+    sendMessageUDP(`${name}: ${message}`);
+
+    // Emit mesazhin përmes Socket.IO
     socket.emit('chatMessage', { name, message });
-    elements.messageInput.value = ''; // Clear input after sending
+
+    // Fshij input-in pasi është dërguar mesazhi
+    elements.messageInput.value = '';
+
   } catch (error) {
     console.error('Error sending message:', error);
     showNotification('Failed to send message', 'error');

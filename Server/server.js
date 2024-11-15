@@ -5,6 +5,7 @@ const os = require("os");
 const cors = require("cors");
 const socketIo = require("socket.io");
 const fs = require("fs");
+const dgram = require("dgram");
 
 const app = express();
 const server = http.createServer(app);
@@ -14,6 +15,32 @@ const io = socketIo(server, {
     methods: ["GET", "POST"],
   },
 });
+
+// UDP server setup
+const udpServer = dgram.createSocket('udp4');
+
+udpServer.on('message', (msg, rinfo) => {
+  console.log(`Received message: ${msg} from ${rinfo.address}:${rinfo.port}`);
+  // Based on the received message, you can handle it accordingly
+
+  io.emit('udpMessage', msg.toString()); 
+  // Sends the message to all connected clients using Socket.IO
+});
+
+udpServer.on('listening', () => {
+  const address = udpServer.address();
+  console.log(`UDP server listening on ${address.address}:${address.port}`);
+});
+
+udpServer.bind(41234);  // Port used for UDP communication
+
+// Function to give access to a client
+const giveAccessToClient = (socketId) => {
+  if (!clients.has(socketId)) {
+    clients.set(socketId, { access: false });
+  }
+  clients.get(socketId).access = true; // Client has access
+};
 
 // Configuration
 const config = {
@@ -173,6 +200,15 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     clients.delete(socket.id);
     io.emit("clientCountUpdate", clients.size);
+  });
+});
+
+// Socket.IO handler për lidhje
+io.on('connection', (socket) => {
+  console.log('New client connected:', socket.id);
+  socket.on('requestAccess', () => {
+    giveAccessToClient(socket.id);
+    socket.emit('accessGranted');
   });
 });
 

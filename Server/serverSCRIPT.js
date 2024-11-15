@@ -225,6 +225,17 @@ socket.on("fileAction", (data) => {
   alert(`File ${data.action} action performed on: ${data.filePath}`);
 });
 
+socket.on('udpMessage', (message) => {
+  const messageDiv = document.createElement("div");
+  messageDiv.className = "message";
+  messageDiv.innerHTML = `
+      <strong>UDP Message</strong>: ${message}
+      <small class="timestamp">${new Date().toLocaleString()}</small>
+  `;
+  elements.chatLog.appendChild(messageDiv);
+  elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+});
+
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
   initializeServerInfo();
