@@ -34,6 +34,40 @@ const updateConnectionStatus = (status) => {
   elements.connectionStatus.className = `status-indicator ${status.toLowerCase()}`;
 };
 
+// Function to connect client and request permissions
+async function connectClient() {
+  const name = elements.clientName.value || "Anonymous";
+  const serverUrl = getServerUrl();
+
+  try {
+    const response = await fetch(`${serverUrl}/connect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to connect to the server");
+    }
+
+    const data = await response.json();
+    initializePermissions(data.permission); // Apply permissions received from the server
+    showNotification(`Connected with ${data.permission} permissions`, "success");
+  } catch (error) {
+    console.error("Connection error:", error);
+    showNotification("Failed to connect to the server", "error");
+  }
+}
+
+// Function to initialize permissions for the client
+function initializePermissions(permission) {
+  elements.filePath.disabled = !permission.includes("read");
+  elements.fileContent.disabled = !permission.includes("write");
+  document.querySelector('button[onclick="readFile()"]').disabled = !permission.includes("read");
+  document.querySelector('button[onclick="writeFile()"]').disabled = !permission.includes("write");
+  document.querySelector('button[onclick="deleteFile()"]').disabled = !permission.includes("execute");
+}
+
 // Server Connection
 async function connectToServer() {
   const name = elements.clientName.value || "Anonymous";
@@ -286,3 +320,5 @@ function disconnectFromServer() {
 document.addEventListener("DOMContentLoaded", () => {
   updateConnectionStatus("Disconnected");
 });
+
+
