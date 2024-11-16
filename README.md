@@ -71,8 +71,8 @@ const PermissionLevel = {
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/file-management-system.git
-cd file-management-system
+git clone https://github.com/artkelmendi/RrjetaKopjuterike-GR7.git
+cd RrjetaKopjuterike-GR7
 ```
 
 2. Install dependencies:
