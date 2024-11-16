@@ -85,12 +85,12 @@ async function connectToServer() {
       document.querySelector(".btn-primary").disabled = true;
 
       // Remove any existing listeners to prevent duplicates
-      socket.off('newMessage');
-      socket.off('fileAction');
+      socket.off("newMessage");
+      socket.off("fileAction");
 
       // Add new listeners
-      socket.on('newMessage', handleNewMessage);
-      socket.on('fileAction', handleFileAction);
+      socket.on("newMessage", handleNewMessage);
+      socket.on("fileAction", handleFileAction);
     });
 
     socket.on("disconnect", () => {
@@ -121,47 +121,47 @@ function handleNewMessage(message) {
     return; // Skip if message already exists
   }
 
-  const messageDiv = document.createElement('div');
+  const messageDiv = document.createElement("div");
   messageDiv.id = messageId; // Add unique ID to message
-  messageDiv.className = 'message';
-  
+  messageDiv.className = "message";
+
   // Format timestamp
   const timestamp = new Date(message.timestamp).toLocaleTimeString();
-  
+
   // Different styling for own messages vs others
   const isOwnMessage = message.name === elements.clientName.value;
-  messageDiv.classList.add(isOwnMessage ? 'own-message' : 'other-message');
+  messageDiv.classList.add(isOwnMessage ? "own-message" : "other-message");
 
   messageDiv.innerHTML = `
     <strong>${message.name}</strong>: ${message.message}
     <span class="timestamp">${timestamp}</span>
   `;
-  
+
   elements.chatBox.appendChild(messageDiv);
   elements.chatBox.scrollTop = elements.chatBox.scrollHeight;
 }
 
 async function sendMessage() {
   if (!socket?.connected) {
-    showNotification('Not connected to server', 'error');
+    showNotification("Not connected to server", "error");
     return;
   }
 
   const message = elements.messageInput.value.trim();
-  const name = elements.clientName.value || 'Anonymous';
+  const name = elements.clientName.value || "Anonymous";
 
   if (!message) {
-    showNotification('Please enter a message', 'warning');
+    showNotification("Please enter a message", "warning");
     return;
   }
 
   try {
     // Emit the message directly through socket instead of fetch
-    socket.emit('chatMessage', { name, message });
-    elements.messageInput.value = ''; // Clear input after sending
+    socket.emit("chatMessage", { name, message });
+    elements.messageInput.value = ""; // Clear input after sending
   } catch (error) {
-    console.error('Error sending message:', error);
-    showNotification('Failed to send message', 'error');
+    console.error("Error sending message:", error);
+    showNotification("Failed to send message", "error");
   }
 }
 
@@ -286,3 +286,93 @@ function disconnectFromServer() {
 document.addEventListener("DOMContentLoaded", () => {
   updateConnectionStatus("Disconnected");
 });
+
+// Add permission-related UI elements
+function updateFilePermissionsUI(file) {
+  const permissionsDiv = document.createElement("div");
+  permissionsDiv.className = "file-permissions";
+
+  // Show current permissions
+  const currentPerms = document.createElement("div");
+  currentPerms.innerHTML = `
+        <h4>Current Permissions</h4>
+        <p>View: ${hasPermission(file, PermissionLevel.VIEW) ? "✓" : "✗"}</p>
+        <p>Edit: ${hasPermission(file, PermissionLevel.EDIT) ? "✓" : "✗"}</p>
+        <p>Execute: ${
+          hasPermission(file, PermissionLevel.EXECUTE) ? "✓" : "✗"
+        }</p>
+        <p>Delete: ${
+          hasPermission(file, PermissionLevel.DELETE) ? "✓" : "✗"
+        }</p>
+    `;
+
+  // Add permission management if user is admin
+  if (currentUser.role === UserRole.ADMIN) {
+    const permissionManager = createPermissionManager(file);
+    permissionsDiv.appendChild(permissionManager);
+  }
+
+  return permissionsDiv;
+}
+
+function createPermissionManager(file) {
+  const manager = document.createElement("div");
+  manager.className = "permission-manager";
+  manager.innerHTML = `
+        <h4>Manage Permissions</h4>
+        <select id="user-select">
+            ${Array.from(users.values())
+              .map(
+                (user) => `<option value="${user.id}">${user.username}</option>`
+              )
+              .join("")}
+        </select>
+        <div class="permission-checkboxes">
+            <label><input type="checkbox" value="${
+              PermissionLevel.VIEW
+            }"> View</label>
+            <label><input type="checkbox" value="${
+              PermissionLevel.EDIT
+            }"> Edit</label>
+            <label><input type="checkbox" value="${
+              PermissionLevel.EXECUTE
+            }"> Execute</label>
+            <label><input type="checkbox" value="${
+              PermissionLevel.DELETE
+            }"> Delete</label>
+        </div>
+        <button onclick="updatePermissions('${
+          file.id
+        }')">Update Permissions</button>
+    `;
+  return manager;
+}
+
+// Permission management functions
+async function updatePermissions(fileId) {
+  const userId = document.getElementById("user-select").value;
+  const checkboxes = document.querySelectorAll(
+    ".permission-checkboxes input:checked"
+  );
+
+  let permissionLevel = 0;
+  checkboxes.forEach((checkbox) => {
+    permissionLevel |= parseInt(checkbox.value);
+  });
+
+  try {
+    const response = await fetch("/permissions/grant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, fileId, permissionLevel }),
+    });
+
+    if (response.ok) {
+      showNotification("Permissions updated successfully", "success");
+    } else {
+      throw new Error("Failed to update permissions");
+    }
+  } catch (error) {
+    showNotification(error.message, "error");
+  }
+}

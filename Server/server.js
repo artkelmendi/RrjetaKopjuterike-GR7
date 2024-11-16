@@ -94,7 +94,6 @@ app.post("/send-message", (req, res) => {
   io.emit("newMessage", messageInfo);
   res.json({ success: true });
 });
-//
 
 app.post("/read-file", (req, res) => {
   const { filePath } = req.body;
