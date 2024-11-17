@@ -1,378 +1,325 @@
-// DOM Elements
+let socket;
+
 const elements = {
-  clientName: document.getElementById("client-name"),
-  serverId: document.getElementById("server-id"),
-  port: document.getElementById("port"),
-  messageInput: document.getElementById("message-input"),
-  chatBox: document.getElementById("chat-box"),
-  filePath: document.getElementById("file-path"),
-  fileContent: document.getElementById("file-content"),
-  connectionStatus: document.getElementById("connection-status"),
-  notificationContainer: document.getElementById("notification-container"),
+	clientName: document.getElementById('client-name'),
+	serverId: document.getElementById('server-id'),
+	port: document.getElementById('port'),
+	connectionStatus: document.getElementById('connection-status'),
+	disconnectBtn: document.getElementById('disconnect-btn'),
+	chatBox: document.getElementById('chat-box'),
+	messageInput: document.getElementById('message-input'),
+	readFilePath: document.getElementById('read-file-path'),
+	writeFilePath: document.getElementById('write-file-path'),
+	fileContentDisplay: document.getElementById('file-content-display'),
+	fileContentWrite: document.getElementById('file-content-write'),
+	writeOperations: document.querySelector('.write-operations'),
+	readOperations: document.querySelector('.read-operations'),
+	fileListBtn: document.querySelector('.file-list-btn'),
+	fileList: document.getElementById('file-list')
 };
 
-// Socket.IO connection
-let socket = null;
-
-// Helper Functions
-const showNotification = (message, type = "info") => {
-  const notification = document.createElement("div");
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  elements.notificationContainer.appendChild(notification);
-  setTimeout(() => notification.remove(), 3000);
-};
-
-const getServerUrl = () => {
-  const serverId = elements.serverId.value;
-  const port = elements.port.value;
-  return `http://${serverId}:${port}`;
-};
-
-const updateConnectionStatus = (status) => {
-  elements.connectionStatus.textContent = status;
-  elements.connectionStatus.className = `status-indicator ${status.toLowerCase()}`;
-};
-
-// Server Connection
+// Connection management
 async function connectToServer() {
-  const name = elements.clientName.value || "Anonymous";
-  const serverId = elements.serverId.value;
-  const port = elements.port.value;
+	const name = elements.clientName.value.trim();
+	const serverId = elements.serverId.value.trim();
+	const port = elements.port.value.trim();
 
-  if (!serverId || !port) {
-    showNotification("Please enter both Server ID and Port.", "error");
-    return;
-  }
+	if (!serverId || !port) {
+		showNotification('Please fill in server details', 'error');
+		return;
+	}
 
-  try {
-    // Initialize Socket.IO connection
-    const serverUrl = `http://${serverId}:${port}`;
-    socket = io(serverUrl, {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      timeout: 10000,
-    });
+	try {
+		socket = io(`http://${serverId}:${port}`, {
+			query: { clientName: name || 'Anonymous' },
+			reconnection: true,
+			reconnectionAttempts: 5,
+			reconnectionDelay: 1000,
+			reconnectionDelayMax: 5000,
+			timeout: 20000
+		});
 
-    // Socket event handlers
-    socket.on("connect", async () => {
-      console.log("Connected to server with socket ID:", socket.id);
-      updateConnectionStatus("Connected");
-
-      // Register with server
-      try {
-        const response = await fetch(`${serverUrl}/connect`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            port,
-            socketId: socket.id,
-          }),
-        });
-
-        if (!response.ok) throw new Error("Connection registration failed");
-
-        const data = await response.json();
-        showNotification(data.message, "success");
-      } catch (error) {
-        console.error("Registration error:", error);
-        showNotification("Failed to register with server", "error");
-      }
-
-      // Enable disconnect button and disable connect button
-      document.getElementById("disconnect-btn").disabled = false;
-      document.querySelector(".btn-primary").disabled = true;
-
-      // Remove any existing listeners to prevent duplicates
-      socket.off("newMessage");
-      socket.off("fileAction");
-
-      // Add new listeners
-      socket.on("newMessage", handleNewMessage);
-      socket.on("fileAction", handleFileAction);
-    });
-
-    socket.on("disconnect", () => {
-      updateConnectionStatus("Disconnected");
-      showNotification("Disconnected from server", "error");
-
-      // Disable disconnect button and enable connect button
-      document.getElementById("disconnect-btn").disabled = true;
-      document.querySelector(".btn-primary").disabled = false;
-    });
-
-    socket.on("connect_error", (error) => {
-      console.error("Connection error:", error);
-      showNotification(`Connection error: ${error.message}`, "error");
-    });
-  } catch (error) {
-    console.error("Connection error:", error);
-    showNotification(`Failed to connect: ${error.message}`, "error");
-    updateConnectionStatus("Disconnected");
-  }
+		setupSocketListeners();
+		
+	} catch (error) {
+		console.error('Connection error:', error);
+			showNotification('Failed to connect to server', 'error');
+	}
 }
 
-// Message Handling
-function handleNewMessage(message) {
-  // Prevent duplicate messages by checking if message already exists
-  const messageId = `${message.name}-${message.timestamp}`;
-  if (document.getElementById(messageId)) {
-    return; // Skip if message already exists
-  }
-
-  const messageDiv = document.createElement("div");
-  messageDiv.id = messageId; // Add unique ID to message
-  messageDiv.className = "message";
-
-  // Format timestamp
-  const timestamp = new Date(message.timestamp).toLocaleTimeString();
-
-  // Different styling for own messages vs others
-  const isOwnMessage = message.name === elements.clientName.value;
-  messageDiv.classList.add(isOwnMessage ? "own-message" : "other-message");
-
-  messageDiv.innerHTML = `
-    <strong>${message.name}</strong>: ${message.message}
-    <span class="timestamp">${timestamp}</span>
-  `;
-
-  elements.chatBox.appendChild(messageDiv);
-  elements.chatBox.scrollTop = elements.chatBox.scrollHeight;
+function disconnect() {
+	if (socket) {
+		socket.disconnect();
+		updateConnectionStatus('Disconnected');
+		elements.disconnectBtn.disabled = true;
+	}
 }
 
-async function sendMessage() {
-  if (!socket?.connected) {
-    showNotification("Not connected to server", "error");
-    return;
-  }
+// Socket event listeners
+function setupSocketListeners() {
+	socket.on('connect', () => {
+		updateConnectionStatus('Connected');
+		elements.disconnectBtn.disabled = false;
+		showNotification('Connected to server', 'success');
+	});
 
-  const message = elements.messageInput.value.trim();
-  const name = elements.clientName.value || "Anonymous";
+	socket.on('disconnect', (reason) => {
+		if (reason === 'io client disconnect') {
+			updateConnectionStatus('Disconnected');
+			elements.disconnectBtn.disabled = true;
+			showNotification('Disconnected from server', 'warning');
+		}
+	});
 
-  if (!message) {
-    showNotification("Please enter a message", "warning");
-    return;
-  }
+	socket.on('reconnect', (attemptNumber) => {
+		updateConnectionStatus('Connected');
+		elements.disconnectBtn.disabled = false;
+		showNotification('Reconnected to server', 'success');
+	});
 
-  try {
-    // Emit the message directly through socket instead of fetch
-    socket.emit("chatMessage", { name, message });
-    elements.messageInput.value = ""; // Clear input after sending
-  } catch (error) {
-    console.error("Error sending message:", error);
-    showNotification("Failed to send message", "error");
-  }
+	socket.on('reconnect_attempt', (attemptNumber) => {
+		showNotification(`Attempting to reconnect (${attemptNumber})...`, 'warning');
+	});
+
+	socket.on('reconnect_error', (error) => {
+		showNotification('Failed to reconnect', 'error');
+	});
+
+	socket.on('accessLevelChanged', (newAccessLevel) => {
+		updateUIForAccessLevel(newAccessLevel);
+		showNotification(`Access level changed to: ${newAccessLevel}`, 'info');
+	});
+
+	socket.on('newMessage', (messageInfo) => {
+		if (!elements.chatBox) return;
+
+		const messageDiv = document.createElement('div');
+		messageDiv.className = `message ${messageInfo.isServer ? 'server-message' : 'client-message'}`;
+		
+		const time = new Date(messageInfo.timestamp).toLocaleTimeString();
+		messageDiv.innerHTML = `
+			<span class="sender">${messageInfo.name}:</span>
+			<span class="content">${messageInfo.message}</span>
+			<span class="time">${time}</span>
+		`;
+
+		elements.chatBox.appendChild(messageDiv);
+		elements.chatBox.scrollTop = elements.chatBox.scrollHeight;
+	});
+
+	socket.on('fileList', (files) => {
+		updateFileList(files);
+	});
+
+	socket.on('fileContent', (data) => {
+		if (elements.fileContentDisplay) {
+			elements.fileContentDisplay.value = data.content;
+			showNotification('File content loaded successfully', 'success');
+		}
+	});
+
+	socket.on('error', (error) => {
+		showNotification(error, 'error');
+	});
+
+	socket.on('success', (message) => {
+		showNotification(message, 'success');
+	});
 }
 
-// File Operations
-async function readFile() {
-  const filePath = elements.filePath.value;
-
-  if (!filePath) {
-    showNotification("Please enter a file path", "error");
-    return;
-  }
-
-  try {
-    const response = await fetch(`${getServerUrl()}/read-file`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath }),
-    });
-
-    const data = await response.json();
-    if (data.success) {
-      elements.fileContent.value = data.content;
-      showNotification("File read successfully", "success");
-    } else {
-      throw new Error(data.message);
-    }
-  } catch (error) {
-    console.error("Error reading file:", error);
-    showNotification(`Error reading file: ${error.message}`, "error");
-  }
+// File operations
+function listFiles() {
+	if (!socket?.connected) {
+		showNotification('Not connected to server', 'error');
+		return;
+	}
+	socket.emit('listFiles');
 }
 
-async function writeFile() {
-  const filePath = elements.filePath.value;
-  const content = elements.fileContent.value;
+function updateFileList(files) {
+	if (!elements.fileList) return;
 
-  if (!filePath || !content) {
-    showNotification("Please enter both file path and content", "error");
-    return;
-  }
+	if (files.length === 0) {
+		elements.fileList.innerHTML = '<p class="empty-message">No files available</p>';
+		return;
+	}
 
-  try {
-    const response = await fetch(`${getServerUrl()}/write-file`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath, content }),
-    });
-
-    const data = await response.json();
-    if (data.success) {
-      showNotification("File written successfully", "success");
-    } else {
-      throw new Error(data.message);
-    }
-  } catch (error) {
-    console.error("Error writing file:", error);
-    showNotification(`Error writing file: ${error.message}`, "error");
-  }
+	elements.fileList.innerHTML = `
+		<div class="file-list-header">Available Files:</div>
+		<ul class="file-list-items">
+			${files.map(file => `
+				<li class="file-item">
+					<i class="fas fa-file-alt"></i>
+					<span>${file}</span>
+					<div class="file-actions">
+						<button onclick="readFile('${file}')" class="btn-small read-control">
+							<i class="fas fa-eye"></i>
+						</button>
+						<button onclick="setWritePath('${file}')" class="btn-small write-control">
+							<i class="fas fa-edit"></i>
+						</button>
+						<button onclick="executeFile('${file}')" class="btn-small execute-control">
+							<i class="fas fa-play"></i>
+						</button>
+					</div>
+				</li>
+			`).join('')}
+		</ul>
+	`;
 }
 
-async function deleteFile() {
-  const filePath = elements.filePath.value;
+function readFile(filePath) {
+	if (!socket?.connected) {
+		showNotification('Not connected to server', 'error');
+		return;
+	}
+	
+	const path = filePath || elements.readFilePath.value.trim();
+	if (!path) {
+		showNotification('Please specify a file path', 'error');
+		return;
+	}
 
-  if (!filePath) {
-    showNotification("Please enter a file path", "error");
-    return;
-  }
-
-  if (!confirm("Are you sure you want to delete this file?")) {
-    return;
-  }
-
-  try {
-    const response = await fetch(`${getServerUrl()}/delete-file`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath }),
-    });
-
-    const data = await response.json();
-    if (data.success) {
-      elements.fileContent.value = "";
-      showNotification("File deleted successfully", "success");
-    } else {
-      throw new Error(data.message);
-    }
-  } catch (error) {
-    console.error("Error deleting file:", error);
-    showNotification(`Error deleting file: ${error.message}`, "error");
-  }
+	socket.emit('readFile', { filePath: path });
 }
 
-// Event Handlers
-function handleFileAction(data) {
-  showNotification(
-    `File ${data.action} action performed on: ${data.filePath}`,
-    "info"
-  );
+function executeFile(filePath) {
+	if (!socket?.connected) {
+		showNotification('Not connected to server', 'error');
+		return;
+	}
+	
+	const path = filePath || elements.readFilePath.value.trim();
+	if (!path) {
+		showNotification('Please specify a file path', 'error');
+		return;
+	}
+
+	socket.emit('executeFile', { filePath: path });
 }
 
-function disconnectFromServer() {
-  if (socket) {
-    socket.disconnect();
-    updateConnectionStatus("Disconnected");
-    showNotification("Disconnected from server", "warning");
+function writeFile() {
+	if (!socket?.connected) {
+		showNotification('Not connected to server', 'error');
+		return;
+	}
 
-    // Disable disconnect button and enable connect button
-    document.getElementById("disconnect-btn").disabled = true;
-    document.querySelector(".btn-primary").disabled = false;
+	const filePath = elements.writeFilePath.value.trim();
+	const content = elements.fileContentWrite.value;
 
-    // Clear chat box
-    elements.chatBox.innerHTML = "";
+	if (!filePath || !content) {
+		showNotification('Please enter both file path and content', 'error');
+		return;
+	}
 
-    // Reset connection fields if needed
-    // elements.clientName.value = '';
-    // elements.serverId.value = '';
-    // elements.port.value = '';
-  }
+	socket.emit('writeFile', { filePath, content });
 }
 
-// Initialize
-document.addEventListener("DOMContentLoaded", () => {
-  updateConnectionStatus("Disconnected");
+function setWritePath(filename) {
+	if (elements.writeFilePath) {
+		elements.writeFilePath.value = filename;
+	}
+}
+
+// Chat functionality
+function sendMessage() {
+	if (!socket?.connected) {
+		showNotification('Not connected to server', 'error');
+		return;
+	}
+
+	const message = elements.messageInput.value.trim();
+	if (!message) {
+		showNotification('Please enter a message', 'warning');
+		return;
+	}
+
+	socket.emit('chatMessage', {
+		message: message,
+		timestamp: new Date()
+	});
+
+	elements.messageInput.value = '';
+}
+
+// UI updates
+function updateConnectionStatus(status) {
+	if (elements.connectionStatus) {
+		elements.connectionStatus.textContent = status;
+		elements.connectionStatus.className = `status-indicator ${status.toLowerCase()}`;
+	}
+}
+
+function updateUIForAccessLevel(accessLevel) {
+	const writeOperations = document.querySelector('.write-operations');
+	const readOperations = document.querySelector('.read-operations');
+	const fileListBtn = document.querySelector('.file-list-btn');
+	const executeControls = document.querySelectorAll('.execute-control');
+	const readControls = document.querySelectorAll('.read-control');
+	const writeControls = document.querySelectorAll('.write-control');
+
+	if (fileListBtn) {
+		fileListBtn.style.display = accessLevel === 'none' ? 'none' : 'block';
+	}
+
+	if (readOperations) {
+		readOperations.style.display = ['read', 'write', 'execute'].includes(accessLevel) ? 'block' : 'none';
+	}
+
+	if (writeOperations) {
+		writeOperations.style.display = accessLevel === 'write' ? 'block' : 'none';
+	}
+
+	readControls.forEach(control => {
+		control.style.display = ['read', 'write', 'execute'].includes(accessLevel) ? 'block' : 'none';
+	});
+
+	writeControls.forEach(control => {
+		control.style.display = accessLevel === 'write' ? 'block' : 'none';
+	});
+
+	executeControls.forEach(control => {
+		control.style.display = accessLevel === 'execute' ? 'block' : 'none';
+	});
+}
+
+// Notification handling
+function showNotification(message, type = 'info') {
+	const notification = document.createElement('div');
+	notification.className = `notification ${type}`;
+	notification.textContent = message;
+	
+	const container = document.getElementById('notification-container');
+	if (!container) return;
+	
+	notification.style.backgroundColor = getNotificationColor(type);
+	notification.style.color = '#ffffff';
+	notification.style.padding = '12px 24px';
+	notification.style.marginBottom = '10px';
+	notification.style.borderRadius = '5px';
+	notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+	
+	container.appendChild(notification);
+	
+	setTimeout(() => {
+		notification.style.opacity = '0';
+		setTimeout(() => notification.remove(), 300);
+	}, 3000);
+}
+
+function getNotificationColor(type) {
+	switch (type) {
+		case 'success': return '#28a745';
+		case 'error': return '#dc3545';
+		case 'warning': return '#ffc107';
+		default: return '#17a2b8';
+	}
+}
+
+// Event listeners
+elements.messageInput?.addEventListener('keypress', (e) => {
+	if (e.key === 'Enter') {
+		sendMessage();
+	}
 });
 
-// Add permission-related UI elements
-function updateFilePermissionsUI(file) {
-  const permissionsDiv = document.createElement("div");
-  permissionsDiv.className = "file-permissions";
-
-  // Show current permissions
-  const currentPerms = document.createElement("div");
-  currentPerms.innerHTML = `
-        <h4>Current Permissions</h4>
-        <p>View: ${hasPermission(file, PermissionLevel.VIEW) ? "✓" : "✗"}</p>
-        <p>Edit: ${hasPermission(file, PermissionLevel.EDIT) ? "✓" : "✗"}</p>
-        <p>Execute: ${
-          hasPermission(file, PermissionLevel.EXECUTE) ? "✓" : "✗"
-        }</p>
-        <p>Delete: ${
-          hasPermission(file, PermissionLevel.DELETE) ? "✓" : "✗"
-        }</p>
-    `;
-
-  // Add permission management if user is admin
-  if (currentUser.role === UserRole.ADMIN) {
-    const permissionManager = createPermissionManager(file);
-    permissionsDiv.appendChild(permissionManager);
-  }
-
-  return permissionsDiv;
-}
-
-function createPermissionManager(file) {
-  const manager = document.createElement("div");
-  manager.className = "permission-manager";
-  manager.innerHTML = `
-        <h4>Manage Permissions</h4>
-        <select id="user-select">
-            ${Array.from(users.values())
-              .map(
-                (user) => `<option value="${user.id}">${user.username}</option>`
-              )
-              .join("")}
-        </select>
-        <div class="permission-checkboxes">
-            <label><input type="checkbox" value="${
-              PermissionLevel.VIEW
-            }"> View</label>
-            <label><input type="checkbox" value="${
-              PermissionLevel.EDIT
-            }"> Edit</label>
-            <label><input type="checkbox" value="${
-              PermissionLevel.EXECUTE
-            }"> Execute</label>
-            <label><input type="checkbox" value="${
-              PermissionLevel.DELETE
-            }"> Delete</label>
-        </div>
-        <button onclick="updatePermissions('${
-          file.id
-        }')">Update Permissions</button>
-    `;
-  return manager;
-}
-
-// Permission management functions
-async function updatePermissions(fileId) {
-  const userId = document.getElementById("user-select").value;
-  const checkboxes = document.querySelectorAll(
-    ".permission-checkboxes input:checked"
-  );
-
-  let permissionLevel = 0;
-  checkboxes.forEach((checkbox) => {
-    permissionLevel |= parseInt(checkbox.value);
-  });
-
-  try {
-    const response = await fetch("/permissions/grant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, fileId, permissionLevel }),
-    });
-
-    if (response.ok) {
-      showNotification("Permissions updated successfully", "success");
-    } else {
-      throw new Error("Failed to update permissions");
-    }
-  } catch (error) {
-    showNotification(error.message, "error");
-  }
-}

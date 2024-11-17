@@ -3,126 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Server management interface for file operations and chat"
-    />
     <title>Server Management Interface</title>
-    <link rel="stylesheet" href="serverSTYLE.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="serverSTYLE.css">
   </head>
   <body>
-    <!-- Status Bar -->
-    <header class="status-bar">
-      <div id="active-client-count" class="client-counter">
-        Active Clients: 0
-      </div>
-    </header>
+    <div class="app-container">
+      <nav class="sidebar">
+        <div class="sidebar-header">
+          <i class="fas fa-server"></i>
+          <h1>Server Panel</h1>
+        </div>
+        <div class="server-status">
+          <div class="status-item">
+            <i class="fas fa-network-wired"></i>
+            <span>IP: <span id="ip" class="highlight"></span></span>
+          </div>
+          <div class="status-item">
+            <i class="fas fa-plug"></i>
+            <span>Port: <span id="port" class="highlight"></span></span>
+          </div>
+          <div class="status-item">
+            <i class="fas fa-users"></i>
+            <span id="active-client-count">Active Clients: 0</span>
+          </div>
+        </div>
+      </nav>
 
-    <main class="container">
-      <!-- Server Information Section -->
-      <section class="server-info-section">
-        <h1>Server Information</h1>
-        <div id="server-info" class="info-panel">
-          <p>IP Address: <span id="ip" class="highlight"></span></p>
-          <p>Port: <span id="port" class="highlight"></span></p>
+      <main class="main-content">
+        <div class="card port-config">
+          <h2><i class="fas fa-cog"></i> Port Configuration</h2>
+          <div class="input-group">
+            <label for="port-input">Listening Port</label>
+            <div class="port-input-group">
+              <input type="number" id="port-input" placeholder="Enter port (1-65535)" min="1" max="65535">
+              <button onclick="setPort()" class="btn primary">
+                <i class="fas fa-save"></i> Set Port
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- Port Configuration -->
-        <div class="port-config">
-          <h2>Set Listening Port</h2>
-          <div class="port-setting">
-            <input
-              type="number"
-              id="port-input"
-              placeholder="Enter port number (1-65535)"
-              min="1"
-              max="65535"
-              required
-            />
-            <button onclick="setPort()" class="primary-button">
-              Start Listening on Port
+        <div class="card clients-card">
+          <h2><i class="fas fa-users"></i> Connected Clients</h2>
+          <div id="client-list" class="client-list">
+            <!-- Clients will be populated here -->
+          </div>
+        </div>
+
+        <div class="card file-operations">
+          <h2><i class="fas fa-folder-open"></i> File Operations</h2>
+          <div class="input-group">
+            <label for="file-path">File Path</label>
+            <input type="text" id="file-path" placeholder="Enter file path (relative to allowed_files directory)">
+          </div>
+          <div class="input-group">
+            <label for="file-content">File Content</label>
+            <textarea id="file-content" placeholder="File content"></textarea>
+          </div>
+          <div class="button-group">
+            <button onclick="readFile()" class="btn secondary">
+              <i class="fas fa-eye"></i> Read
+            </button>
+            <button onclick="writeFile()" class="btn primary">
+              <i class="fas fa-save"></i> Write
+            </button>
+            <button onclick="deleteFile()" class="btn danger">
+              <i class="fas fa-trash"></i> Delete
             </button>
           </div>
         </div>
-      </section>
 
-      <!-- Client Management Section -->
-      <section class="clients-section">
-        <h2>Connected Clients</h2>
-        <ul id="client-list" class="client-list"></ul>
-      </section>
-
-      <!-- Chat Section -->
-      <section class="chat-section">
-        <h2>Chat Logs</h2>
-        <div id="chat-log" class="chat-log"></div>
-        <div class="chat-input">
-          <input
-            type="text"
-            id="chat-name"
-            placeholder="Your name"
-            maxlength="50"
-          />
-          <input
-            type="text"
-            id="chat-message"
-            placeholder="Type a message"
-            maxlength="500"
-          />
-          <button onclick="sendMessage()" class="primary-button">Send</button>
-        </div>
-      </section>
-
-      <!-- File Operations Section -->
-      <section class="file-operations-section">
-        <h2>File Operations</h2>
-        <div class="file-operations">
-          <div class="file-path-input">
-            <input
-              type="text"
-              id="file-path"
-              placeholder="Enter file path (relative to allowed_files directory)"
-              maxlength="255"
-            />
-          </div>
-          <div class="file-content-area">
-            <textarea
-              id="file-content"
-              placeholder="File content"
-              rows="6"
-            ></textarea>
-          </div>
-          <div class="file-buttons">
-            <button
-              onclick="readFile()"
-              class="action-button"
-              title="Read file contents"
-            >
-              Read File
-            </button>
-            <button
-              onclick="writeFile()"
-              class="action-button"
-              title="Save changes to file"
-            >
-              Write File
-            </button>
-            <button
-              onclick="deleteFile()"
-              class="action-button danger"
-              title="Delete file permanently"
-            >
-              Delete File
+        <div class="card chat-card">
+          <h2><i class="fas fa-comments"></i> Server Chat</h2>
+          <div id="chat-log" class="chat-log"></div>
+          <div class="message-input-group">
+            <input type="text" id="chat-message" placeholder="Type a message...">
+            <button onclick="sendServerMessage()" class="btn primary">
+              <i class="fas fa-paper-plane"></i>
             </button>
           </div>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
 
-    <!-- Error/Success Message Container -->
-    <div id="message-container" class="message-container"></div>
-
-    <!-- Scripts -->
+    <div id="notification-container"></div>
+    
     <script src="/socket.io/socket.io.js"></script>
     <script src="serverSCRIPT.js"></script>
   </body>

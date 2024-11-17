@@ -4,7 +4,8 @@ const path = require("path");
 const os = require("os");
 const cors = require("cors");
 const socketIo = require("socket.io");
-const fs = require("fs");
+const fs = require("fs").promises;
+const fsSync = require("fs");
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +14,15 @@ const io = socketIo(server, {
     origin: "*",
     methods: ["GET", "POST"],
   },
+});
+
+// Serve static files
+app.use(express.static(path.join(__dirname))); // Serve files from Server directory
+app.use('/clientUI', express.static(path.join(__dirname, '../clientUI'))); // Serve client files
+
+// Add root route to serve serverHTML.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'serverHTML.html'));
 });
 
 // Configuration
@@ -25,235 +35,196 @@ const config = {
 let currentPort = config.defaultPort;
 const clients = new Map();
 const messages = [];
+const accessLevels = {
+    NONE: 'none',
+    READ: 'read',
+    WRITE: 'write',
+    EXECUTE: 'execute'
+};
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // Ensure allowed_files directory exists
-if (!fs.existsSync(config.allowedDirectory)) {
-  fs.mkdirSync(config.allowedDirectory, { recursive: true });
+if (!fsSync.existsSync(config.allowedDirectory)) {
+  fsSync.mkdirSync(config.allowedDirectory, { recursive: true });
 }
 
-// Helper functions
-const getIPAddress = () => {
-  const interfaces = os.networkInterfaces();
-  for (let name in interfaces) {
-    for (let iface of interfaces[name]) {
-      if (iface.family === "IPv4" && !iface.internal) {
-        return iface.address;
-      }
+// Helper Functions
+function getIPAddress() {
+    const interfaces = os.networkInterfaces();
+    for (const devName in interfaces) {
+        const iface = interfaces[devName];
+        for (const alias of iface) {
+            if (alias.family === 'IPv4' && !alias.internal) {
+                return alias.address;
+            }
+        }
     }
-  }
-  return "127.0.0.1";
-};
+    return 'localhost';
+}
 
-const isPathSafe = (filePath) => {
-  const normalizedPath = path.normalize(filePath);
-  return normalizedPath.startsWith(config.allowedDirectory);
-};
-
-// API Routes
-app.get("/server-info", (req, res) => {
-  const serverInfo = {
-    ip: getIPAddress(),
-    port: currentPort,
-  };
-  console.log("Sending server info:", serverInfo);
-  res.json(serverInfo);
-});
-
-app.post("/connect", (req, res) => {
-  const { name, port, socketId } = req.body;
-  const clientInfo = {
-    name: name || "Anonymous",
-    port: port,
-    socketId: socketId,
-    connectedAt: new Date().toISOString(),
-  };
-
-  clients.set(socketId, clientInfo);
-  io.emit("clientCountUpdate", clients.size);
-
-  res.json({ message: "Connection successful!", clientInfo });
-});
-
-app.get("/clients", (req, res) => {
-  res.json(Array.from(clients.values()));
-});
-
-app.post("/send-message", (req, res) => {
-  const { name, message } = req.body;
-  const messageInfo = {
-    name,
-    message,
-    timestamp: new Date().toISOString(),
-  };
-
-  messages.push(messageInfo);
-  io.emit("newMessage", messageInfo);
-  res.json({ success: true });
-});
-
-app.post("/read-file", (req, res) => {
-  const { filePath } = req.body;
-  const fullPath = path.join(config.allowedDirectory, filePath);
-
-  if (!isPathSafe(fullPath)) {
-    return res.status(403).json({ success: false, message: "Access denied" });
-  }
-
-  fs.readFile(fullPath, "utf8", (err, data) => {
-    if (err) {
-      console.error("Error reading file:", err);
-      return res
-        .status(500)
-        .json({ success: false, message: "File read error" });
-    }
-    res.json({ success: true, content: data });
-  });
-});
-
-app.post("/write-file", (req, res) => {
-  const { filePath, content } = req.body;
-  const fullPath = path.join(config.allowedDirectory, filePath);
-
-  if (!isPathSafe(fullPath)) {
-    return res.status(403).json({ success: false, message: "Access denied" });
-  }
-
-  fs.writeFile(fullPath, content, "utf8", (err) => {
-    if (err) {
-      console.error("Error writing file:", err);
-      return res
-        .status(500)
-        .json({ success: false, message: "File write error" });
-    }
-    io.emit("fileAction", { action: "write", filePath });
-    res.json({ success: true, message: "File written successfully" });
-  });
-});
-
-app.post("/delete-file", (req, res) => {
-  const { filePath } = req.body;
-  const fullPath = path.join(config.allowedDirectory, filePath);
-
-  if (!isPathSafe(fullPath)) {
-    return res.status(403).json({ success: false, message: "Access denied" });
-  }
-
-  fs.unlink(fullPath, (err) => {
-    if (err) {
-      console.error("Error deleting file:", err);
-      return res
-        .status(500)
-        .json({ success: false, message: "File delete error" });
-    }
-    io.emit("fileAction", { action: "delete", filePath });
-    res.json({ success: true, message: "File deleted successfully" });
-  });
-});
-
-// Socket.IO event handlers
-// In your Socket.IO event handlers section
-io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
-
-  socket.on("chatMessage", (messageData) => {
-    const messageInfo = {
-      name: messageData.name,
-      message: messageData.message,
-      timestamp: new Date().toISOString(),
-    };
-
-    // Broadcast to all clients including sender
-    io.emit("newMessage", messageInfo);
-  });
-
-  socket.on("disconnect", () => {
-    clients.delete(socket.id);
-    io.emit("clientCountUpdate", clients.size);
-  });
-});
-
-// Remove or modify the /send-message endpoint since we're using socket events
-
-// Static files
-app.use(express.static(path.join(__dirname)));
-
-// Catch-all route
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "serverHTML.html"));
-});
-
-// Port finding and server start
-const findAvailablePort = async (startPort) => {
-  let port = startPort;
-  const maxPort = startPort + 10;
-
-  while (port < maxPort) {
-    try {
-      await new Promise((resolve, reject) => {
-        const testServer = http.createServer();
-        testServer.listen(port, () => {
-          testServer.close();
-          resolve();
-        });
-        testServer.on("error", () => {
-          reject();
-        });
-      });
-      return port;
-    } catch {
-      port++;
-    }
-  }
-  throw new Error("No available ports found");
-};
-
-const startServer = async (port = config.defaultPort) => {
-  try {
-    const availablePort = await findAvailablePort(port);
-    currentPort = availablePort;
-
-    return new Promise((resolve, reject) => {
-      server
-        .listen(currentPort, () => {
-          const address = getIPAddress();
-          console.log(`Server running at http://${address}:${currentPort}`);
-          resolve(currentPort);
-        })
-        .on("error", (err) => {
-          console.error(`Error starting server:`, err);
-          reject(err);
-        });
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+    
+    // Get client name from query parameters
+    const clientName = socket.handshake.query.clientName || 'Anonymous';
+    
+    // Add client to clients map
+    clients.set(socket.id, {
+        id: socket.id,
+        name: clientName,
+        accessLevel: accessLevels.NONE,
+        connectedAt: new Date()
     });
-  } catch (error) {
-    console.error("Server start failed:", error);
-    throw error;
-  }
-};
 
-// Handle port changes
-app.post("/set-port", async (req, res) => {
-  const { port } = req.query;
-  const newPort = parseInt(port);
+    // Notify all clients about the updated client list
+    io.emit('clientListUpdate', Array.from(clients.values()));
 
-  if (!port || newPort < 1 || newPort > 65535) {
-    return res.status(400).json({ error: "Invalid port number" });
-  }
+    // Handle chat messages
+    socket.on('chatMessage', (messageInfo) => {
+        const client = clients.get(socket.id);
+        if (client) {
+            const message = {
+                name: client.name,
+                message: messageInfo.message,
+                timestamp: new Date(),
+                isServer: false
+            };
+            io.emit('newMessage', message);
+        }
+    });
 
-  try {
-    await server.close();
-    const usedPort = await startServer(newPort);
-    res.json({ success: true, port: usedPort });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to change port" });
-  }
+    // Handle server messages
+    socket.on('serverMessage', (messageInfo) => {
+        const message = {
+            name: 'Server',
+            message: messageInfo.message,
+            timestamp: new Date(),
+            isServer: true
+        };
+        io.emit('newMessage', message);
+    });
+
+    // Handle file operations
+    socket.on('listFiles', async () => {
+        try {
+            const client = clients.get(socket.id);
+            if (!client || client.accessLevel === accessLevels.NONE) {
+                socket.emit('error', 'No permission to list files');
+                return;
+            }
+
+            const files = await fs.readdir(config.allowedDirectory);
+            socket.emit('fileList', files);
+        } catch (error) {
+            console.error('Error listing files:', error);
+            socket.emit('error', 'Failed to list files');
+        }
+    });
+
+    socket.on('readFile', async ({ filePath }) => {
+        try {
+            const client = clients.get(socket.id);
+            if (!client || !['read', 'write', 'execute'].includes(client.accessLevel)) {
+                socket.emit('error', 'No permission to read files');
+                return;
+            }
+
+            const fullPath = path.join(config.allowedDirectory, filePath);
+            const content = await fs.readFile(fullPath, 'utf8');
+            socket.emit('fileContent', { content });
+        } catch (error) {
+            console.error('Error reading file:', error);
+            socket.emit('error', `Failed to read file: ${error.message}`);
+        }
+    });
+
+    socket.on('writeFile', async ({ filePath, content }) => {
+        try {
+            const client = clients.get(socket.id);
+            if (!client || client.accessLevel !== 'write') {
+                socket.emit('error', 'No permission to write files');
+                return;
+            }
+
+            const fullPath = path.join(config.allowedDirectory, filePath);
+            await fs.writeFile(fullPath, content, 'utf8');
+            socket.emit('success', 'File written successfully');
+        } catch (error) {
+            console.error('Error writing file:', error);
+            socket.emit('error', `Failed to write file: ${error.message}`);
+        }
+    });
+
+    socket.on('executeFile', async ({ filePath }) => {
+        try {
+            const client = clients.get(socket.id);
+            if (!client || client.accessLevel !== 'execute') {
+                socket.emit('error', 'No permission to execute files');
+                return;
+            }
+
+            // Add your file execution logic here
+            socket.emit('success', 'File executed successfully');
+        } catch (error) {
+            console.error('Error executing file:', error);
+            socket.emit('error', `Failed to execute file: ${error.message}`);
+        }
+    });
+
+    // Handle access level changes
+    socket.on('setAccessLevel', ({ clientId, accessLevel }) => {
+        const client = clients.get(clientId);
+        if (client) {
+            client.accessLevel = accessLevel;
+            clients.set(clientId, client);
+            
+            // Notify all clients about the updated client list
+            io.emit('clientListUpdate', Array.from(clients.values()));
+            
+            // Notify the specific client about their access level change
+            io.to(clientId).emit('accessLevelChanged', accessLevel);
+            
+            console.log(`Updated access level for client ${clientId} to ${accessLevel}`);
+        }
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+        clients.delete(socket.id);
+        io.emit('clientListUpdate', Array.from(clients.values()));
+    });
 });
 
-// Start the server
-startServer().catch((err) => {
-  console.error("Failed to start server:", err);
-  process.exit(1);
+// Server info endpoint
+app.get('/server-info', (req, res) => {
+    res.json({
+        ip: getIPAddress(),
+        port: currentPort
+    });
+});
+
+// Port configuration endpoint
+app.post('/set-port', (req, res) => {
+    const { port } = req.body;
+    if (!port || port < 1 || port > 65535) {
+        res.status(400).json({
+            success: false,
+            error: 'Invalid port number'
+        });
+        return;
+    }
+
+    currentPort = port;
+    res.json({ success: true });
+});
+
+// Start server
+server.listen(currentPort, () => {
+    console.log(`Server running on port ${currentPort}`);
+    console.log(`Server IP: ${getIPAddress()}`);
 });

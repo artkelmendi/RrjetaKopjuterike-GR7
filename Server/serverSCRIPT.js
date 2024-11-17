@@ -5,11 +5,11 @@ const elements = {
   portInput: document.getElementById("port-input"),
   clientList: document.getElementById("client-list"),
   chatLog: document.getElementById("chat-log"),
-  chatName: document.getElementById("chat-name"),
   chatMessage: document.getElementById("chat-message"),
   filePath: document.getElementById("file-path"),
   fileContent: document.getElementById("file-content"),
   activeClientCount: document.getElementById("active-client-count"),
+  notificationContainer: document.getElementById("notification-container")
 };
 
 // Socket.IO connection
@@ -18,108 +18,150 @@ let socket = io();
 // Initialize server info
 async function initializeServerInfo() {
   try {
-    const response = await fetch("/server-info", {
-      headers: {
-        Accept: "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
+    const response = await fetch("/server-info");
     const data = await response.json();
-    console.log("Server info received:", data);
-
-    if (data.ip && data.port) {
-      elements.ip.textContent = data.ip;
-      elements.port.textContent = data.port;
-    } else {
-      console.error("Invalid server info data:", data);
-    }
+    
+    if (elements.ip) elements.ip.textContent = data.ip;
+    if (elements.port) elements.port.textContent = data.port;
   } catch (error) {
     console.error("Error fetching server info:", error);
+    showNotification("Failed to fetch server info", "error");
   }
 }
 
 // Port management
 async function setPort() {
-  const port = elements.portInput.value;
-  if (!port || port < 1 || port > 65535) {
-    alert("Please enter a valid port number (1-65535)");
+  const newPort = elements.portInput?.value;
+  if (!newPort) {
+    showNotification('Please enter a port number', 'error');
     return;
   }
 
   try {
-    const response = await fetch(`/set-port?port=${port}`, { method: "POST" });
-    const data = await response.json();
+    const response = await fetch('/set-port', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ port: newPort })
+    });
 
-    if (data.error) {
-      alert(`Error: ${data.error}`);
+    const data = await response.json();
+    if (data.success) {
+      showNotification(`Port updated to ${newPort}`, 'success');
+      if (elements.port) elements.port.textContent = newPort;
     } else {
-      elements.port.textContent = data.port;
-      alert(`Server now listening on port ${data.port}`);
+      throw new Error(data.error || 'Failed to update port');
     }
   } catch (error) {
-    console.error("Error setting port:", error);
-    alert("Failed to change port");
+    showNotification(`Error setting port: ${error.message}`, 'error');
+  }
+}
+
+// Notification handling
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  
+  if (!elements.notificationContainer) return;
+  
+  notification.style.backgroundColor = getNotificationColor(type);
+  notification.style.color = '#ffffff';
+  notification.style.padding = '12px 24px';
+  notification.style.marginBottom = '10px';
+  notification.style.borderRadius = '5px';
+  notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+  
+  elements.notificationContainer.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
+}
+
+function getNotificationColor(type) {
+  switch (type) {
+    case 'success': return '#28a745';
+    case 'error': return '#dc3545';
+    case 'warning': return '#ffc107';
+    default: return '#17a2b8';
   }
 }
 
 // Client management
-async function updateClientList() {
-  try {
-    const response = await fetch("/clients");
-    const clients = await response.json();
-
-    elements.clientList.innerHTML = clients
-      .map(
-        (client) => `
-          <li>
-              <strong>${client.name}</strong>
-              <span class="client-info">Connected: ${new Date(
-                client.connectedAt
-              ).toLocaleString()}</span>
-          </li>
-      `
-      )
-      .join("");
-  } catch (error) {
-    console.error("Error updating client list:", error);
-  }
-}
-
-// Message handling
-async function sendMessage() {
-  const message = elements.chatMessage.value;
-  const name = elements.chatName.value || "Anonymous";
-
-  if (!message.trim()) {
-    alert("Please enter a message");
+function updateClientList(clients) {
+  if (!elements.clientList) return;
+  
+  if (!clients || clients.length === 0) {
+    elements.clientList.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-users-slash"></i>
+        <p>No clients connected</p>
+      </div>`;
     return;
   }
 
-  try {
-    const response = await fetch("/send-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, message }),
-    });
+  elements.clientList.innerHTML = clients.map(client => `
+    <div class="client-card">
+      <div class="client-info">
+        <div class="client-header">
+          <i class="fas fa-user"></i>
+          <span class="client-name">${client.name || 'Anonymous'}</span>
+        </div>
+        <span class="client-id">ID: ${client.id}</span>
+        <span class="client-time">Connected: ${new Date(client.connectTime).toLocaleTimeString()}</span>
+      </div>
+      <div class="client-controls">
+        <select class="access-select" onchange="updateClientAccess('${client.id}', this.value)">
+          <option value="none" ${client.accessLevel === 'none' ? 'selected' : ''}>No Access</option>
+          <option value="read" ${client.accessLevel === 'read' ? 'selected' : ''}>Read Only</option>
+          <option value="write" ${client.accessLevel === 'write' ? 'selected' : ''}>Read & Write</option>
+          <option value="execute" ${client.accessLevel === 'execute' ? 'selected' : ''}>Execute</option>
+        </select>
+        <button class="btn danger" onclick="disconnectClient('${client.id}')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
 
-    if (!response.ok) throw new Error("Failed to send message");
+// Message handling
+function sendServerMessage() {
+  if (!socket?.connected) {
+    showNotification('Not connected to socket server', 'error');
+    return;
+  }
 
-    elements.chatMessage.value = "";
-  } catch (error) {
-    console.error("Error sending message:", error);
-    alert("Failed to send message");
+  const message = elements.chatMessage?.value.trim();
+  if (!message) {
+    showNotification('Please enter a message', 'warning');
+    return;
+  }
+
+  socket.emit('serverMessage', {
+    message: message,
+    timestamp: new Date().toISOString()
+  });
+
+  if (elements.chatMessage) {
+    elements.chatMessage.value = '';
   }
 }
 
 // File operations
+function listFiles() {
+  if (!socket?.connected) {
+    showNotification('Not connected to socket server', 'error');
+    return;
+  }
+  socket.emit('listFiles');
+}
+
 async function readFile() {
-  const filePath = elements.filePath.value;
+  const filePath = elements.filePath?.value;
   if (!filePath) {
-    alert("Please enter a file path");
+    showNotification("Please enter a file path", "warning");
     return;
   }
 
@@ -133,22 +175,22 @@ async function readFile() {
     const data = await response.json();
     if (data.success) {
       elements.fileContent.value = data.content;
-      alert("File read successfully");
+      showNotification("File read successfully", "success");
     } else {
       throw new Error(data.message);
     }
   } catch (error) {
     console.error("Error reading file:", error);
-    alert(`Error reading file: ${error.message}`);
+    showNotification(`Error reading file: ${error.message}`, "error");
   }
 }
 
 async function writeFile() {
-  const filePath = elements.filePath.value;
-  const content = elements.fileContent.value;
+  const filePath = elements.filePath?.value;
+  const content = elements.fileContent?.value;
 
   if (!filePath || !content) {
-    alert("Please enter both file path and content");
+    showNotification("Please enter both file path and content", "warning");
     return;
   }
 
@@ -161,20 +203,20 @@ async function writeFile() {
 
     const data = await response.json();
     if (data.success) {
-      alert("File written successfully");
+      showNotification("File written successfully", "success");
     } else {
       throw new Error(data.message);
     }
   } catch (error) {
     console.error("Error writing file:", error);
-    alert(`Error writing file: ${error.message}`);
+    showNotification(`Error writing file: ${error.message}`, "error");
   }
 }
 
 async function deleteFile() {
-  const filePath = elements.filePath.value;
+  const filePath = elements.filePath?.value;
   if (!filePath) {
-    alert("Please enter a file path");
+    showNotification("Please enter a file path", "warning");
     return;
   }
 
@@ -192,41 +234,78 @@ async function deleteFile() {
     const data = await response.json();
     if (data.success) {
       elements.fileContent.value = "";
-      alert("File deleted successfully");
+      showNotification("File deleted successfully", "success");
     } else {
       throw new Error(data.message);
     }
   } catch (error) {
     console.error("Error deleting file:", error);
-    alert(`Error deleting file: ${error.message}`);
+    showNotification(`Error deleting file: ${error.message}`, "error");
   }
 }
 
+function updateClientAccess(clientId, accessLevel) {
+  if (!socket?.connected) {
+    showNotification('Not connected to socket server', 'error');
+    return;
+  }
+
+  socket.emit('setAccessLevel', {
+    clientId: clientId,
+    accessLevel: accessLevel
+  });
+}
+
 // Socket event handlers
-socket.on("clientCountUpdate", (count) => {
-  elements.activeClientCount.textContent = `Active Clients: ${count}`;
-  updateClientList();
-});
+function initializeSocketConnection() {
+  socket = io();
 
-socket.on("newMessage", (message) => {
-  const messageDiv = document.createElement("div");
-  messageDiv.className = "message";
-  messageDiv.innerHTML = `
-      <strong>${message.name}</strong>: ${message.message}
-      <small class="timestamp">${new Date(
-        message.timestamp
-      ).toLocaleString()}</small>
-  `;
-  elements.chatLog.appendChild(messageDiv);
-  elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
-});
+  socket.on('connect', () => {
+    showNotification('Socket server connected', 'success');
+  });
 
-socket.on("fileAction", (data) => {
-  alert(`File ${data.action} action performed on: ${data.filePath}`);
-});
+  socket.on('disconnect', () => {
+    showNotification('Socket server disconnected', 'error');
+  });
+
+  socket.on('clientListUpdate', (clients) => {
+    updateClientList(clients);
+    if (elements.activeClientCount) {
+      elements.activeClientCount.textContent = `Active Clients: ${clients.length}`;
+    }
+  });
+
+  socket.on('newMessage', (messageInfo) => {
+    if (!elements.chatLog) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${messageInfo.isServer ? 'server-message' : 'client-message'}`;
+    
+    const time = new Date(messageInfo.timestamp).toLocaleTimeString();
+    messageDiv.innerHTML = `
+      <span class="sender">${messageInfo.name || 'Server'}:</span>
+      <span class="content">${messageInfo.message}</span>
+      <span class="time">${time}</span>
+    `;
+
+    elements.chatLog.appendChild(messageDiv);
+    elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+  });
+
+  socket.on('fileList', (files) => {
+    showNotification(`Available files: ${files.join(', ')}`, 'info');
+  });
+}
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
   initializeServerInfo();
-  updateClientList();
+  initializeSocketConnection();
+  
+  // Add event listener for chat input
+  elements.chatMessage?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendServerMessage();
+    }
+  });
 });
