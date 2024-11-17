@@ -1,174 +1,150 @@
-/// DOM Elements
 const elements = {
   ip: document.getElementById("ip"),
   port: document.getElementById("port"),
-  portInput: document.getElementById("port-input"),
   clientList: document.getElementById("client-list"),
   chatLog: document.getElementById("chat-log"),
   chatMessage: document.getElementById("chat-message"),
   filePath: document.getElementById("file-path"),
   fileContent: document.getElementById("file-content"),
   activeClientCount: document.getElementById("active-client-count"),
-  notificationContainer: document.getElementById("notification-container")
+  notificationContainer: document.getElementById("notification-container"),
+  loadingIndicator: document.getElementById("loading-indicator"), // Add a loading indicator in the HTML
 };
 
-// Socket.IO connection
-let socket = io();
+let serverAddress = '127.0.0.1'; // Default to localhost if fetching fails
+let serverPort = 3000; // Default UDP port
 
-// Initialize server info
-async function initializeServerInfo() {
+// Fetch server info
+async function fetchServerAddress() {
   try {
-    const response = await fetch("/server-info");
+    const response = await fetch('/server-info'); // Server provides its info on this endpoint
     const data = await response.json();
-    
-    if (elements.ip) elements.ip.textContent = data.ip;
-    if (elements.port) elements.port.textContent = data.port;
+    if (data.ip) serverAddress = data.ip;
+    if (data.port) serverPort = data.port;
+
+    if (elements.ip) elements.ip.textContent = serverAddress;
+    if (elements.port) elements.port.textContent = serverPort;
   } catch (error) {
     console.error("Error fetching server info:", error);
     showNotification("Failed to fetch server info", "error");
   }
 }
 
-// Port management
-async function setPort() {
-  const newPort = elements.portInput?.value;
-  if (!newPort) {
-    showNotification('Please enter a port number', 'error');
-    return;
-  }
+// Call this during initialization
+fetchServerAddress();
 
-  try {
-    const response = await fetch('/set-port', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ port: newPort })
-    });
-
-    const data = await response.json();
-    if (data.success) {
-      showNotification(`Port updated to ${newPort}`, 'success');
-      if (elements.port) elements.port.textContent = newPort;
-    } else {
-      throw new Error(data.error || 'Failed to update port');
-    }
-  } catch (error) {
-    showNotification(`Error setting port: ${error.message}`, 'error');
-  }
-}
-
-// Notification handling
+// Helper function to show notifications
 function showNotification(message, type = 'info') {
   const notification = document.createElement('div');
   notification.className = `notification ${type}`;
   notification.textContent = message;
-  
-  if (!elements.notificationContainer) return;
-  
-  notification.style.backgroundColor = getNotificationColor(type);
-  notification.style.color = '#ffffff';
-  notification.style.padding = '12px 24px';
-  notification.style.marginBottom = '10px';
-  notification.style.borderRadius = '5px';
-  notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-  
-  elements.notificationContainer.appendChild(notification);
-  
+
+  if (elements.notificationContainer) {
+    elements.notificationContainer.appendChild(notification);
+  }
+
   setTimeout(() => {
-    notification.style.opacity = '0';
-    setTimeout(() => notification.remove(), 300);
+    notification.remove();
   }, 3000);
 }
 
-function getNotificationColor(type) {
-  switch (type) {
-    case 'success': return '#28a745';
-    case 'error': return '#dc3545';
-    case 'warning': return '#ffc107';
-    default: return '#17a2b8';
+// Helper function to toggle loading indicator
+function toggleLoading(isLoading) {
+  if (!elements.loadingIndicator) return;
+  elements.loadingIndicator.style.display = isLoading ? "block" : "none";
+}
+
+// Send a message to the server (via HTTP)
+async function sendMessageToServer(type, data = {}) {
+  try {
+    const response = await fetch('/send-udp-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, data }),
+    });
+
+    if (!response.ok) throw new Error('Failed to send message');
+
+    const result = await response.json();
+    showNotification(result.message || 'Message sent', 'success');
+  } catch (err) {
+    console.error("Error sending message to server:", err);
+    showNotification("Failed to send message to server", "error");
   }
 }
 
-// Client management
-function updateClientList(clients) {
-  if (!elements.clientList) return;
-  
-  if (!clients || clients.length === 0) {
-    elements.clientList.innerHTML = `
-      <div class="empty-state">
-        <i class="fas fa-users-slash"></i>
-        <p>No clients connected</p>
-      </div>`;
-    return;
-  }
+// Fetch messages from the server
+async function fetchMessages() {
+  try {
+    const response = await fetch('/get-udp-messages');
+    if (!response.ok) throw new Error('Failed to fetch messages');
 
-  elements.clientList.innerHTML = clients.map(client => `
-    <div class="client-card">
-      <div class="client-info">
-        <div class="client-header">
-          <i class="fas fa-user"></i>
-          <span class="client-name">${client.name || 'Anonymous'}</span>
-        </div>
-        <span class="client-id">ID: ${client.id}</span>
-        <span class="client-time">Connected: ${new Date(client.connectTime).toLocaleTimeString()}</span>
-      </div>
-      <div class="client-controls">
-        <select class="access-select" onchange="updateClientAccess('${client.id}', this.value)">
-          <option value="none" ${client.accessLevel === 'none' ? 'selected' : ''}>No Access</option>
-          <option value="read" ${client.accessLevel === 'read' ? 'selected' : ''}>Read Only</option>
-          <option value="write" ${client.accessLevel === 'write' ? 'selected' : ''}>Read & Write</option>
-          <option value="execute" ${client.accessLevel === 'execute' ? 'selected' : ''}>Execute</option>
-        </select>
-        <button class="btn danger" onclick="disconnectClient('${client.id}')">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-    </div>
-  `).join('');
+    const messages = await response.json();
+    updateChatLog(messages);
+  } catch (err) {
+    console.error("Error fetching messages:", err);
+  }
 }
 
-// Message handling
+// Update the chat log
+function updateChatLog(messages) {
+  if (!elements.chatLog) return;
+
+  elements.chatLog.innerHTML = '';
+  messages.forEach((message) => displayChatMessage(message));
+}
+
+// Display a chat message
+function displayChatMessage(data) {
+  if (!elements.chatLog) return;
+
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message ${data.isServer ? 'server-message' : 'client-message'}`;
+
+  const time = new Date(data.timestamp).toLocaleTimeString();
+  messageDiv.innerHTML = `
+    <span class="sender">${data.name || 'Server'}:</span>
+    <span class="content">${data.message}</span>
+    <span class="time">${time}</span>
+  `;
+
+  elements.chatLog.appendChild(messageDiv);
+  elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+}
+
+// Send a chat message to the server
 function sendServerMessage() {
-  if (!socket?.connected) {
-    showNotification('Not connected to socket server', 'error');
-    return;
-  }
-
   const message = elements.chatMessage?.value.trim();
   if (!message) {
     showNotification('Please enter a message', 'warning');
     return;
   }
 
-  socket.emit('serverMessage', {
-    message: message,
-    timestamp: new Date().toISOString()
-  });
+  sendMessageToServer('CHAT', { message });
 
   if (elements.chatMessage) {
     elements.chatMessage.value = '';
   }
 }
 
-// File operations
+// Request list of files from the server
 function listFiles() {
-  if (!socket?.connected) {
-    showNotification('Not connected to socket server', 'error');
-    return;
-  }
-  socket.emit('listFiles');
+  sendMessageToServer('LIST_FILES');
 }
 
+// Request to read a file
 async function readFile() {
-  const filePath = elements.filePath?.value;
+  const filePath = elements.filePath?.value.trim();
   if (!filePath) {
     showNotification("Please enter a file path", "warning");
     return;
   }
 
+  toggleLoading(true); // Show loading indicator
   try {
-    const response = await fetch("/read-file", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('/read-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filePath }),
     });
 
@@ -181,23 +157,27 @@ async function readFile() {
     }
   } catch (error) {
     console.error("Error reading file:", error);
-    showNotification(`Error reading file: ${error.message}`, "error");
+    showNotification(`Error: ${error.message}`, "error");
+  } finally {
+    toggleLoading(false); // Hide loading indicator
   }
 }
 
+
 async function writeFile() {
-  const filePath = elements.filePath?.value;
-  const content = elements.fileContent?.value;
+  const filePath = elements.filePath?.value.trim();
+  const content = elements.fileContent?.value.trim();
 
   if (!filePath || !content) {
-    showNotification("Please enter both file path and content", "warning");
+    showNotification("Please provide both file path and content", "warning");
     return;
   }
 
+  toggleLoading(true); // Show loading indicator
   try {
-    const response = await fetch("/write-file", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('/write-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filePath, content }),
     });
 
@@ -209,99 +189,143 @@ async function writeFile() {
     }
   } catch (error) {
     console.error("Error writing file:", error);
-    showNotification(`Error writing file: ${error.message}`, "error");
+    showNotification(`Error: ${error.message}`, "error");
+  } finally {
+    toggleLoading(false); // Hide loading indicator
   }
 }
-
+// Request to delete a file
 async function deleteFile() {
-  const filePath = elements.filePath?.value;
+  const filePath = elements.filePath?.value.trim();
   if (!filePath) {
-    showNotification("Please enter a file path", "warning");
+    showNotification("Please enter a file path to delete", "warning");
     return;
   }
 
-  if (!confirm("Are you sure you want to delete this file?")) {
+
+  const confirmDelete = confirm(`Are you sure you want to delete the file: ${filePath}?`);
+  if (!confirmDelete) {
+    showNotification("File deletion canceled", "info");
     return;
   }
 
+  toggleLoading(true);
   try {
-    const response = await fetch("/delete-file", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('/delete-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filePath }),
     });
 
     const data = await response.json();
     if (data.success) {
-      elements.fileContent.value = "";
       showNotification("File deleted successfully", "success");
+      elements.fileContent.value = ""; // Clear file content area
     } else {
       throw new Error(data.message);
     }
   } catch (error) {
     console.error("Error deleting file:", error);
-    showNotification(`Error deleting file: ${error.message}`, "error");
+    showNotification(`Error: ${error.message}`, "error");
+  } finally {
+    toggleLoading(false);
   }
 }
-
-function updateClientAccess(clientId, accessLevel) {
-  if (!socket?.connected) {
-    showNotification('Not connected to socket server', 'error');
+function sendChatMessage() {
+  const message = elements.chatMessage?.value.trim();
+  if (!message) {
+    showNotification('Please enter a message to send', 'warning');
     return;
   }
 
-  socket.emit('setAccessLevel', {
-    clientId: clientId,
-    accessLevel: accessLevel
-  });
+  // Send the chat message to the server
+  sendMessageToServer('CHAT', { message });
+
+  // Clear the input field
+  if (elements.chatMessage) {
+    elements.chatMessage.value = '';
+  }
+
+  showNotification('Message sent', 'success');
 }
 
-// Socket event handlers
-function initializeSocketConnection() {
-  socket = io();
 
-  socket.on('connect', () => {
-    showNotification('Socket server connected', 'success');
-  });
+async function fetchChatMessages() {
+  try {
+    const response = await fetch('/get-udp-messages');
+    if (!response.ok) throw new Error('Failed to fetch chat messages');
 
-  socket.on('disconnect', () => {
-    showNotification('Socket server disconnected', 'error');
-  });
+    const messages = await response.json();
+    updateChatLog(messages);
+  } catch (err) {
+    console.error("Error fetching chat messages:", err);
+  }
+}
 
-  socket.on('clientListUpdate', (clients) => {
-    updateClientList(clients);
-    if (elements.activeClientCount) {
-      elements.activeClientCount.textContent = `Active Clients: ${clients.length}`;
-    }
-  });
+function updateChatLog(messages) {
+  if (!elements.chatLog) return;
 
-  socket.on('newMessage', (messageInfo) => {
-    if (!elements.chatLog) return;
+  elements.chatLog.innerHTML = '';
+  messages.forEach((message) => displayChatMessage(message));
+}
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${messageInfo.isServer ? 'server-message' : 'client-message'}`;
-    
-    const time = new Date(messageInfo.timestamp).toLocaleTimeString();
-    messageDiv.innerHTML = `
-      <span class="sender">${messageInfo.name || 'Server'}:</span>
-      <span class="content">${messageInfo.message}</span>
-      <span class="time">${time}</span>
+function displayChatMessage(data) {
+  if (!elements.chatLog) return;
+
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message ${data.isServer ? 'server-message' : 'client-message'}`;
+
+  const time = new Date(data.timestamp).toLocaleTimeString();
+  messageDiv.innerHTML = `
+        <span class="sender">${data.name || 'Server'}:</span>
+        <span class="content">${data.message || 'No content provided'}</span>
+        <span class="time">${time}</span>
     `;
 
-    elements.chatLog.appendChild(messageDiv);
-    elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
-  });
-
-  socket.on('fileList', (files) => {
-    showNotification(`Available files: ${files.join(', ')}`, 'info');
-  });
+  elements.chatLog.appendChild(messageDiv);
+  elements.chatLog.scrollTop = elements.chatLog.scrollHeight; // Scroll to the latest message
 }
+
+
+
+setInterval(fetchChatMessages, 5000);
+
+
+
+// Update client list
+function updateClientList(clients) {
+  if (!elements.clientList) return;
+
+  if (!clients || clients.length === 0) {
+    elements.clientList.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-users-slash"></i>
+        <p>No clients connected</p>
+      </div>`;
+    return;
+  }
+
+  elements.clientList.innerHTML = clients
+      .map(
+          (client) => `
+    <div class="client-card">
+      <div class="client-info">
+        <span class="client-name">${client.name || 'Anonymous'}</span>
+        <span class="client-id">ID: ${client.id}</span>
+      </div>
+    </div>
+  `
+      )
+      .join('');
+}
+
+// Periodically fetch messages
+setInterval(fetchMessages, 5000);
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
-  initializeServerInfo();
-  initializeSocketConnection();
-  
+  fetchServerAddress();
+
   // Add event listener for chat input
   elements.chatMessage?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {

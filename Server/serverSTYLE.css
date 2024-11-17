@@ -364,3 +364,30 @@ textarea {
 .clients-card h2 i {
   color: var(--primary-color);
 }
+.loading-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  color: #007bff;
+  z-index: 9999;
+  text-align: center;
+}
+.server-message {
+  background-color: #007bff;
+  color: white;
+  padding: 10px;
+  border-radius: 5px;
+  margin: 5px 0;
+  text-align: left;
+}
+
+.client-message {
+  background-color: #f1f1f1;
+  color: black;
+  padding: 10px;
+  border-radius: 5px;
+  margin: 5px 0;
+  text-align: left;
+}

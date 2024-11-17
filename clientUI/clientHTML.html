@@ -1,110 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Client Interface</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="clientSTYLE.css" />
-  </head>
-  <body>
-    <div class="app-container">
-      <nav class="sidebar">
-        <div class="sidebar-header">
-          <i class="fas fa-desktop"></i>
-          <h1>Client Panel</h1>
-        </div>
-        <div class="connection-status">
-          <div id="connection-status" class="status-indicator">Disconnected</div>
-        </div>
-      </nav>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client Interface</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="clientSTYLE.css" />
+</head>
+<body>
+<div class="app-container">
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <i class="fas fa-desktop"></i>
+      <h1>Client Panel</h1>
+    </div>
+    <div class="connection-status">
+      <div id="connection-status" class="status-indicator">Disconnected</div>
+    </div>
+  </nav>
 
-      <main class="main-content">
-        <div class="connection-card card">
-          <h2><i class="fas fa-plug"></i> Connection</h2>
-          <div class="connection-form">
-            <div class="input-group">
-              <label for="client-name">Name</label>
-              <input type="text" id="client-name" placeholder="Your Name">
-            </div>
-            <div class="input-group">
-              <label for="server-id">Server IP</label>
-              <input type="text" id="server-id" placeholder="Server IP">
-            </div>
-            <div class="input-group">
-              <label for="port">Port</label>
-              <input type="text" id="port" placeholder="Port">
-            </div>
-            <div class="button-group">
-              <button onclick="connectToServer()" class="btn primary"><i class="fas fa-link"></i> Connect</button>
-              <button id="disconnect-btn" onclick="disconnect()" class="btn danger" disabled><i class="fas fa-unlink"></i> Disconnect</button>
-            </div>
-          </div>
+  <main class="main-content">
+    <div class="connection-card card">
+      <h2><i class="fas fa-plug"></i> Connection</h2>
+      <div class="connection-form">
+        <div class="input-group">
+          <label for="client-name">Name</label>
+          <input type="text" id="client-name" placeholder="Your Name">
         </div>
-
-        <div class="file-card card">
-          <div class="card-header">
-            <h2><i class="fas fa-folder-open"></i> Files</h2>
-            <button onclick="listFiles()" class="btn secondary file-list-btn">
-              <i class="fas fa-list"></i> List Files
-            </button>
-          </div>
-          <div id="file-list" class="file-list"></div>
-          
-          <!-- Read Operations -->
-          <div class="file-operations read-operations">
-            <h3>Read File</h3>
-            <div class="input-group">
-              <label for="read-file-path">File Path</label>
-              <input type="text" id="read-file-path" placeholder="Enter file path to read">
-            </div>
-            <div class="input-group">
-              <label for="file-content-display">Content</label>
-              <textarea id="file-content-display" readonly placeholder="File content will appear here"></textarea>
-            </div>
-            <div class="button-group">
-              <button onclick="readFile()" class="btn secondary read-control">
-                <i class="fas fa-eye"></i> View
-              </button>
-              <button onclick="executeFile()" class="btn warning execute-control">
-                <i class="fas fa-play"></i> Execute
-              </button>
-            </div>
-          </div>
-          
-          <!-- Write Operations -->
-          <div class="file-operations write-operations">
-            <h3>Write File</h3>
-            <div class="input-group">
-              <label for="write-file-path">File Path</label>
-              <input type="text" id="write-file-path" placeholder="Enter file path to write">
-            </div>
-            <div class="input-group">
-              <label for="file-content-write">Content</label>
-              <textarea id="file-content-write" placeholder="Enter content to write"></textarea>
-            </div>
-            <div class="button-group">
-              <button onclick="writeFile()" class="btn primary write-control">
-                <i class="fas fa-save"></i> Save
-              </button>
-            </div>
-          </div>
+        <div class="input-group">
+          <label for="server-id">Server IP</label>
+          <input type="text" id="server-id" placeholder="Server IP">
         </div>
-
-        <div class="chat-card card">
-          <h2><i class="fas fa-comments"></i> Chat</h2>
-          <div id="chat-box" class="chat-box"></div>
-          <div class="message-input-group">
-            <input type="text" id="message-input" placeholder="Type your message...">
-            <button onclick="sendMessage()" class="btn primary"><i class="fas fa-paper-plane"></i></button>
-          </div>
+        <div class="input-group">
+          <label for="port">Port</label>
+          <input type="text" id="port" placeholder="Port">
         </div>
-      </main>
+        <div class="button-group">
+          <button onclick="connectToServer()" class="btn primary"><i class="fas fa-link"></i> Connect</button>
+          <button id="disconnect-btn" onclick="disconnect()" class="btn danger" disabled><i class="fas fa-unlink"></i> Disconnect</button>
+        </div>
+      </div>
     </div>
 
-    <div id="notification-container"></div>
-    
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="clientSCRIPT.js"></script>
-  </body>
+    <div class="file-card card">
+      <div class="card-header">
+        <h2><i class="fas fa-folder-open"></i> Files</h2>
+        <button onclick="listFiles()" class="btn secondary file-list-btn">
+          <i class="fas fa-list"></i> List Files
+        </button>
+      </div>
+      <div id="file-list" class="file-list"></div>
+
+      <!-- Read Operations -->
+      <div class="file-operations read-operations">
+        <h3>Read File</h3>
+        <div class="input-group">
+          <label for="read-file-path">File Path</label>
+          <input type="text" id="read-file-path" placeholder="Enter file path to read">
+        </div>
+        <div class="input-group">
+          <label for="file-content-display">Content</label>
+          <textarea id="file-content-display" readonly placeholder="File content will appear here"></textarea>
+        </div>
+        <div class="button-group">
+          <button onclick="readFile()" class="btn secondary read-control">
+            <i class="fas fa-eye"></i> View
+          </button>
+          <button onclick="executeFile()" class="btn warning execute-control">
+            <i class="fas fa-play"></i> Execute
+          </button>
+        </div>
+      </div>
+
+      <!-- Write Operations -->
+      <div class="file-operations write-operations">
+        <h3>Write File</h3>
+        <div class="input-group">
+          <label for="write-file-path">File Path</label>
+          <input type="text" id="write-file-path" placeholder="Enter file path to write">
+        </div>
+        <div class="input-group">
+          <label for="file-content-write">Content</label>
+          <textarea id="file-content-write" placeholder="Enter content to write"></textarea>
+        </div>
+        <div class="button-group">
+          <button onclick="writeFile()" class="btn primary write-control">
+            <i class="fas fa-save"></i> Save
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-card card">
+      <h2><i class="fas fa-comments"></i> Chat</h2>
+      <div id="chat-box" class="chat-box"></div>
+      <div class="message-input-group">
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button onclick="sendChatMessage()" class="btn primary"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="notification-container"></div>
+
+<script src="clientSCRIPT.js"></script>
+</body>
 </html>
