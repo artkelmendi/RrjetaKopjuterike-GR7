@@ -13,10 +13,10 @@ app.use(cors({ origin: '*' }));
 
 // Configuration
 const config = {
-    udpPort: 3000, // Fixed UDP port
+    udpPort: 3000,
     allowedDirectory: path.join(__dirname, "allowed_files"),
-    clientTimeout: 30000, // Client timeout duration in ms
-    httpPort: 3001 // HTTP server port
+    clientTimeout: 30000,
+    httpPort: 3001
 };
 
 // State management
@@ -197,15 +197,16 @@ app.get('/server-info', (req, res) => {
 });
 
 // Send a message to the UDP server
-app.post('/send-udp-message', (req, res) => {
+app.post('/send-udp-message', async (req, res) => {
     const { type, data } = req.body;
 
     if (type === MessageTypes.LIST_FILES) {
         try {
-            const files = await fs.readdir(config.allowedDirectory);
+            const files = await fs.readdir(config.allowedDirectory); // Fixed: Async function needed
             broadcastToAll(MessageTypes.LIST_FILES, files);
             return res.json({ success: true, files });
         } catch (error) {
+            console.error("Error listing files:", error);
             return res.status(500).json({ success: false, message: "Failed to list files" });
         }
     }
@@ -248,6 +249,7 @@ app.post('/send-udp-message', (req, res) => {
         message: "Invalid message type."
     });
 });
+
 
 
 
