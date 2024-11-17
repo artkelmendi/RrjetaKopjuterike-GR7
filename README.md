@@ -1,252 +1,187 @@
-# File Management System with Real-Time Communication
+# UDP Multi-User File Management System
+
+## University Details
+
+- University: University of Prishtina "Hasan Prishtina"
+- Faculty: Faculty of Electrical and Computer Enigneering
+- Department: Computer and Software Engineering
+- Course: Computer Network
+- Semester: 5th Semester
+
+## Supervisors
+
+- Professor: Blerim Rexha
+- Assistent: Mergim Hoti
+
+## Contributors
+
+- [Art Kelmendi](https://github.com/artkelmendi)
+- [Art Jashari](https://github.com/Art-Jashari)
+- [Argjend Nimanaj](https://github.com/Argjend1of1)
+- [Armenie Sadikaj](https://github.com/armeniasadikaj)
 
 ## Overview
 
-This project implements a client-server file management system with real-time communication capabilities and comprehensive user permissions. The system allows multiple clients to connect to a central server, manage files, and communicate in real-time while maintaining secure access controls.
+A Node.js-based file management system with real-time user interaction, role-based access control, and file operations support.
 
 ## Features
 
-- Real-time client-server communication
-- File operations (read, write, execute, delete)
-- User authentication and authorization
-- Role-based access control
-- File-specific permissions
-- Live chat functionality
-- Real-time notifications
-- Secure file operations
+### Role-Based Access Control
 
-## System Architecture
+- **Admin**: Full system access, user management
+- **Power User**: Read, write, and execute files
+- **Moderator**: Read and write files
+- **User**: Read-only access
 
-### Server Components
+### File Operations
 
-- **Express Server**: Handles HTTP requests and serves static files
-- **Socket.IO Server**: Manages real-time communication
-- **File System Manager**: Handles file operations
-- **Permission System**: Controls access to resources
-- **User Management**: Handles user authentication and sessions
+- List files in managed directory
+- Read file contents
+- Create and edit files
+- Execute supported file types (.js, .py, .sh, .bat)
+- Delete files (admin only)
 
-### Client Components
+### User Management
 
-- **UI Interface**: User-friendly interface for file operations
-- **Socket.IO Client**: Manages real-time communication with server
-- **Permission Manager**: Handles user permissions display and management
-- **File Operation Interface**: Interface for file manipulation
-- **Chat System**: Real-time communication between users
+- Real-time user tracking
+- Dynamic role assignment
+- Live status updates
+- Connection/disconnection monitoring
 
-## Permission System
+## Commands
 
-### User Roles
+### Basic Commands (All Users)
 
-```javascript
-const UserRole = {
-  GUEST: "guest", // Limited access
-  USER: "user", // Standard access
-  MODERATOR: "mod", // Enhanced access
-  ADMIN: "admin", // Full access
-};
+```bash
+list
+read <filename>
+exit: Quit application
 ```
 
-### Permission Levels
+### Moderator Commands (+ Basic Commands)
 
-```javascript
-const PermissionLevel = {
-  NONE: 0, // No access
-  VIEW: 1, // Can view files
-  EDIT: 2, // Can edit files
-  EXECUTE: 4, // Can execute files
-  DELETE: 8, // Can delete files
-  ADMIN: 15, // All permissions
-};
+```bash
+write <filename> <content> : Create/Update file with content
 ```
 
-## Setup and Installation
+### Power User Commands (+ Moderator Commands)
 
-### Prerequisites
+```bash
+execute <filename> : Execute file
+```
 
-- Node.js (v14.0.0 or higher)
-- npm (v6.0.0 or higher)
+### Admin Commands (+ All Commands)
 
-### Installation Steps
+```bash
+delete <filename> : Delete file (admin only)
+users : List connected users
+setrole <username> <role> : Set user role
+```
 
-1. Clone the repository:
+## Installation
+
+1. Clone the repository
 
 ```bash
 git clone https://github.com/artkelmendi/RrjetaKopjuterike-GR7.git
-cd RrjetaKopjuterike-GR7
 ```
 
-2. Install dependencies:
+2. Dependencies
 
-```bash
-npm install
-```
+The project uses only Node.js built-in modules:
 
-3. Configure the environment:
-
-```bash
-cp .env.example .env
-```
-
-# Edit .env with your settings
-
-4. Start the server:
-
-```bash
-npm start
-```
+- [dgram](https://nodejs.org/api/dgram.html) - UDP networking
+- [fs](https://nodejs.org/api/fs.html) - File system operations
+- [path](https://nodejs.org/api/path.html) - Path manipulation
+- [child_process](https://nodejs.org/api/child_process.html) - Process management
+- [readline](https://nodejs.org/api/readline.html) - Interactive input
 
 ## Usage
 
-### Starting the Server
+1. Start the server
 
 ```bash
-node Server/server.js
+node server.js
 ```
 
-The server will start on the default port (3000) or the port specified in your environment variables.
+2. Start the client
 
-### Connecting Clients
-
-1. Open a web browser
-2. Navigate to `http://localhost:3000/clientUI/clientHTML.html`
-3. Enter connection details:
-   - Name
-   - Server ID (localhost or IP)
-   - Port number
-
-### File Operations
-
-- **View Files**: Click on file to view contents
-- **Edit Files**: Use the editor to modify file contents
-- **Delete Files**: Use delete button (requires permission)
-- **Execute Files**: Use execute button (requires permission)
-
-### Managing Permissions
-
-#### As Admin
-
-1. Select a file
-2. Click "Manage Permissions"
-3. Choose user
-4. Set permission levels
-5. Save changes
-
-#### Checking Permissions
-
-```javascript
-// Example permission check
-if (user.hasPermission(PermissionLevel.EDIT, fileId)) {
-  // Allow edit operation
-}
+```bash
+node client.js
 ```
 
-## Project Structure
+3. First connected user becomes admin, subsequent users join as regular users
 
-```
+## System Requirements
+
+- Node.js v12.0.0 or higher
+- UDP port 3000 available
+
+## File Structure
+
+```bash
 project/
-├── clientUI/
-│   ├── clientHTML.html    # Client interface
-│   ├── clientSTYLE.css    # Client styling
-│   └── clientSCRIPT.js    # Client logic
-├── Server/
-│   ├── server.js          # Main server file
-│   ├── serverHTML.html    # Server interface
-│   ├── serverSTYLE.css    # Server styling
-│   ├── serverSCRIPT.js    # Server logic
-│   └── models/
-│       ├── permissions.js # Permission definitions
-│       ├── users.js      # User management
-│       └── files.js      # File operations
-├── package.json
-└── README.md
+├── server.js # Server implementation
+├── client.js # Client implementation
+└── managed_files/ # Directory for managed files
 ```
 
-## API Endpoints
+## Security Features
 
-### File Operations
+- Role-based permission checks
+- Operation confirmations
+- Path validation
+- Process execution timeouts
+- Interactive process management
 
-- `GET /files/:fileId` - Retrieve file
-- `POST /files/:fileId/edit` - Edit file
-- `POST /files/:fileId/execute` - Execute file
-- `DELETE /files/:fileId` - Delete file
+## File Support
 
-### Permission Management
+- Javascript (.js)
+- Python (.py),
+- Bash (.sh),
+- Batch files (.bat)
 
-- `POST /permissions/grant` - Grant permissions
-- `POST /permissions/revoke` - Revoke permissions
-- `GET /permissions/:fileId` - Get file permissions
+## Technical Details
 
-## Socket Events
+- Built with Node.js
+- Uses UDP for communication
+- Real-time updates
+- Interactive command-line interface
+- Support for multiple file types
 
-### Client -> Server
+## Example Usage
 
-- `connectToServer` - Initialize connection
-- `fileOperation` - Request file operation
-- `chatMessage` - Send chat message
-- `requestPermission` - Request permission change
+```bash
+# Start server
+$ node server.js
+✓ Server running on 0.0.0.0:3000
+→ Managing files in: ./managed_files
 
-### Server -> Client
+# Start client
+$ node client.js
+Enter your name: Admin
+✓ Welcome Admin!
+Role: Administrator
 
-- `connectionStatus` - Connection updates
-- `fileOperationResult` - Operation results
-- `newMessage` - New chat messages
-- `permissionUpdate` - Permission changes
-
-## Security
-
-- All file operations are permission-checked
-- Paths are sanitized to prevent directory traversal
-- User sessions are authenticated
-- Real-time operations are verified
-- File access is logged
+# Connect as user
+$ node client.js
+Enter your name: User
+✓ Welcome User!
+Role: User
+```
 
 ## Error Handling
 
-The system includes comprehensive error handling for:
+- Invalid permissions
+- File not found
+- Invalid commands
+- Connection errors
+- Process execution errors
 
-- Connection failures
-- Permission denials
-- File operation errors
-- Invalid requests
-- System errors
+## Notes
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Connection Failed**
-
-   - Verify server is running
-   - Check port availability
-   - Confirm network connectivity
-
-2. **Permission Denied**
-
-   - Verify user role
-   - Check file permissions
-   - Confirm operation requirements
-
-3. **File Operation Failed**
-   - Check file existence
-   - Verify file permissions
-   - Confirm operation validity
-
-### Debug Mode
-
-Enable debug mode by setting `DEBUG=true` in your environment variables.
-
-## Contact
-
-For support or queries, please open an issue in the repository.
+- First connected user becomes admin
+- File operations are managed in a dedicated directory
+- Interactive process execution with timeout (5 minutes)
+- Real-time user management and status updates
+- Color-coded console output for enhanced readability
